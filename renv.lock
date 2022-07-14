@@ -44,6 +44,25 @@
       "Hash": "37348ee784e82c0a6b650146275b459d",
       "Requirements": []
     },
+    "BiocManager": {
+      "Package": "BiocManager",
+      "Version": "1.30.18",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "b1a93bed5debda5775636086fdca017b",
+      "Requirements": []
+    },
+    "BiocVersion": {
+      "Package": "BiocVersion",
+      "Version": "3.15.2",
+      "Source": "Bioconductor",
+      "git_url": "https://git.bioconductor.org/packages/BiocVersion",
+      "git_branch": "master",
+      "git_last_commit": "818ab03",
+      "git_last_commit_date": "2022-03-29",
+      "Hash": "48e545a2fa24a967de72b1114bfe96ac",
+      "Requirements": []
+    },
     "Biostrings": {
       "Package": "Biostrings",
       "Version": "2.64.0",
@@ -167,10 +186,10 @@
     },
     "MASS": {
       "Package": "MASS",
-      "Version": "7.3-57",
+      "Version": "7.3-58",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "71476c1d88d1ebdf31580e5a257d5d31",
+      "Hash": "4bf2c61e656bbc238634c798c208d386",
       "Requirements": []
     },
     "Matrix": {
@@ -1229,10 +1248,10 @@
     },
     "interp": {
       "Package": "interp",
-      "Version": "1.1-2",
+      "Version": "1.1-3",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "cdd44b7923133793f634d29236eee214",
+      "Hash": "593dde779b230c60c4b589fd306bcd3e",
       "Requirements": [
         "Rcpp",
         "RcppEigen",
@@ -1496,10 +1515,10 @@
     },
     "nlme": {
       "Package": "nlme",
-      "Version": "3.1-157",
+      "Version": "3.1-158",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "dbca60742be0c9eddc5205e5c7ca1f44",
+      "Hash": "9469aeaeddf4f48a7ac70877d0b7ba36",
       "Requirements": [
         "lattice"
       ]
@@ -1949,10 +1968,10 @@
     },
     "rlang": {
       "Package": "rlang",
-      "Version": "1.0.3",
+      "Version": "1.0.4",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "9103a8f74b2114a5ed1136b471d8feca",
+      "Hash": "6539dd8c651e67e3b55b5ffea106362b",
       "Requirements": []
     },
     "rlist": {
