@@ -1,0 +1,360 @@
+---
+title: "draft"
+author: "Haipeng Sun"
+date: "1/10/2022"
+output: html_document
+---
+
+## library
+```{r setup, message=FALSE, warning=FALSE}
+library(knitr)
+library(readxl)
+library(phyloseq)
+library(qiime2R)
+library(picante)
+library(Hmisc)
+library(usedist)
+library(purrr)
+library(furrr)
+library(picante)
+library(vegan)
+library(tidyverse)
+```
+
+## settings
+```{r}
+# set path
+path_rec = "~/Dropbox/IFNH CSR/ExperimentRecords/"
+temp_out = "~/Dropbox/Rutgers/20211222_IFNH_CSR_new/output/"
+metafile = "MasterMetadata-CS-SW-20220623-hs.xlsx"
+# set colors, labs and so on
+BirthMode_color = c("VF"="#377EB8", "CSR"="#4DAF4A", "CS"="#E41A1C")
+Sex_labs = c("F" = "Female", "M" = "Male")
+responder_color = c("Responder"="#d95f0e", "Nonresponder"="gray50")
+BW_status_color = c("Overweight"="#7570b3", "Normal"="#b3cde3","Underweight"="#66a61e")
+```
+
+## Body weight data
+### Body weight summary
+```{r}
+BW <- read_excel(paste0(path_rec, metafile), sheet = "BodyWeightRecords", range = "A1:T2009") %>% filter(!is.na(Weight_g))
+BW$BirthMode = factor(BW$BirthMode, levels = c("CS", "CSR","VF"))
+BW = BW %>% mutate(covid = case_when(Batch %in% c("Batch9","Batch10") ~ "Post covid",
+                                     TRUE ~ "Before covid"))
+
+BW_sum <- BW %>% group_by(TimePoint_Weeks, BirthMode, Sex) %>% 
+  summarise(N = n(),
+            N_batch = unique(Batch) %>% length,
+            N_family = unique(FamilyNo) %>% length(),
+            Mean = mean(Weight_g), 
+            SE = sd(Weight_g)/sqrt(N),
+            SD = sd(Weight_g),
+            boot.lo = smean.cl.boot(Weight_g, conf.int = .95, B = 1000, na.rm = T, reps = F)[2],
+            boot.hi = smean.cl.boot(Weight_g, conf.int = .95, B = 1000, na.rm = T, reps = F)[3]) %>%
+  ungroup()
+
+BW_sum %>% mutate(Count = paste0(N, "(", N_family, ")")) %>% 
+  select(BirthMode, Sex, TimePoint_Weeks, Count) %>% 
+  spread(key = TimePoint_Weeks, value = Count) 
+```
+
+### LitterSize
+```{r}
+a = BW %>% select(FamilyID, LitterSize_Born, LitterSize_InProject) %>% unique()
+cor(a$LitterSize_Born,a$LitterSize_InProject)
+```
+
+### Gestational days 
+```{r}
+FR <- read_excel(paste0(path_rec, metafile), sheet = "FamilyRecords", na = c("","NA"), range = "A1:V145")
+a = table(FR$BirthMode,FR$GestationalDay_Birth)
+aa = a %>% as.matrix.data.frame() %>% as.data.frame()
+colnames(aa) = colnames(a)
+rownames(aa) = rownames(a)
+a
+```
+
+### Body Weight gain relative to week 3
+```{r}
+BWgain= BW %>% filter(TimePoint_Weeks > 2) %>% 
+  arrange(MouseID, TimePoint_Weeks) %>% 
+  group_by(MouseID) %>% 
+    mutate(BW_gain = Weight_g - Weight_g[1], 
+           BW_gain_percent = BW_gain/Weight_g[1],
+           N = n()) %>% 
+    filter(TimePoint_Weeks > 3, N > 3) %>% 
+  ungroup()
+
+BWgain_sum <- BWgain %>% group_by(TimePoint_Weeks, BirthMode, Sex) %>% 
+  summarise(N = n(), 
+            N_batch = unique(Batch) %>% length, 
+            N_family = unique(FamilyNo) %>% length(), 
+            Mean = mean(BW_gain), 
+            boot.lo = smean.cl.boot(BW_gain, conf.int = .95, B = 1000, na.rm = T, reps = F)[2],
+            boot.hi = smean.cl.boot(BW_gain, conf.int = .95, B = 1000, na.rm = T, reps = F)[3],
+            Mean_p = mean(BW_gain_percent), 
+            boot_p.lo = smean.cl.boot(BW_gain_percent, conf.int = .95, B = 1000, na.rm = T, reps = F)[2],
+            boot_p.hi = smean.cl.boot(BW_gain_percent, conf.int = .95, B = 1000, na.rm = T, reps = F)[3])
+
+BWgain_sum %>% mutate(Count = paste0(N, "(", N_family, ")")) %>% 
+  select(BirthMode, Sex, TimePoint_Weeks, Count) %>% 
+  spread(key = TimePoint_Weeks, value = Count)
+```
+
+
+## Fecal 16S
+### import into phyloseq
+```{r}
+phylo_all = qza_to_phyloseq(features = "../data/04_dada/table_csr.qza",
+                         taxonomy = "../data/05_taxa/taxonomy_all_silva138.qza",
+                         tree =  "../data/04_dada/rooted_tree_all.qza",
+                         metadata = "../data/meta_csr.txt")
+```
+
+### metadata
+```{r}
+meta_all = phylo_all@sam_data@.Data %>% as.data.frame()
+names(meta_all) = phylo_all@sam_data@names
+meta_all$SampleID = phylo_all@sam_data@row.names
+meta_all$Seq_count = sample_sums(phylo_all)
+meta_all %>% filter(Generation == "F1") %>% {table(.$BirthMode, .$TimePointInWeeks)}
+meta_all = meta_all %>% mutate(TimePoint = case_when(TimePointInWeeks == 3 ~ "Week3",
+                                          TimePointInWeeks == 6 ~ "Week6",
+                                          TimePointInWeeks == 18 ~ "Week18",
+                                          TimePointInWeeks %in% c(9,11,12,14) ~ "Week9-14"))
+meta_all$TimePoint = factor(meta_all$TimePoint, levels = c("Week3","Week6","Week9-14","Week18"),ordered = T)
+meta_all %>% filter(Generation == "F1") %>% {table(.$BirthMode, .$TimePoint)}
+meta_all$Sample_or_Blank = ifelse(is.na(meta_all$MouseID),T,F)
+
+sam_new = sample_data(meta_all %>% column_to_rownames(var = "SampleID"))
+sample_data(phylo_all) = sam_new
+```
+
+### taxa
+```{r}
+taxa = tax_table(phylo_all@tax_table) %>% as.matrix() %>% as.data.frame() %>% rownames_to_column(var = "id")
+taxa = taxa %>% mutate(ASV = str_c("asv_", 1:nrow(taxa)),
+                       Kingdom = str_replace_na(Kingdom,""), Kingdom = str_c("k_",Kingdom),
+                       Phylum = str_replace_na(Phylum,""), Phylum = str_c("p_",Phylum),
+                       Class = str_replace_na(Class,""), Class = str_c("c_",Class),
+                       Order = str_replace_na(Order,""), Order = str_c("o_",Order),
+                       Family = str_replace_na(Family,""), Family = str_c("f_",Family),
+                       Genus = str_replace_na(Genus,""), Genus = str_c("g_",Genus),
+                       Species = str_replace_na(Species,""), Species = str_c("s_",Species)
+                      )
+```
+
+### decontam
+```{r}
+library(decontam)
+
+contamdf = isContaminant(phylo_all, method="combined", conc="PCR_Conc",neg="Sample_or_Blank" )
+contam_id = contamdf %>% filter(contaminant) %>% rownames()
+phylo_decomtan = prune_taxa(!(taxa_names(phylo_all) %in% contam_id), phylo_all)
+taxa %>% filter(id %in% contam_id)
+```
+
+### rarefy depth
+```{r}
+cbind(sample_sums(phylo_all), sample_sums(phylo_decomtan)) %>% as.data.frame() %>% 
+  rename(original=V1, decontamed=V2)%>%
+  merge(., meta_all, by.x=0, by.y="SampleID") %>% 
+  transmute(SampleID=Row.names, DNA_Conc, MouseID, FamilyID, SampleType, TimePointInWeeks, Generation, BirthMode, original, decontamed) %>% arrange(decontamed) %>% head(n = 20)
+
+ft_decontam = otu_table(phylo_decomtan) %>% as.matrix() %>% as.data.frame() %>% t()
+
+coverage_stat = ft_decontam %>% as.data.frame() %>% 
+  rownames_to_column(var = "SampleID") %>% 
+  pivot_longer(cols = -SampleID, names_to = "id", values_to = "count") %>% 
+  filter(count > 0) %>% group_by(SampleID) %>%
+  summarise(n_seqs = sum(count),
+            n_singles = sum(count==1),
+            goods = 100*(1 - n_singles/n_seqs)) %>% 
+  ungroup()
+
+coverage_stat %>% ggplot(aes(x=n_seqs)) + 
+  geom_histogram() + 
+  labs(x="Depth", title = "Histograph of sequencing depth") 
+
+coverage_stat %>% arrange(n_seqs) %>%
+  ggplot(aes(x=1:nrow(.), y=n_seqs))+ 
+  geom_point() + 
+  labs(x = "", y="Depth", title = "Sequencing depth low to high")
+
+coverage_stat %>%ggplot(aes(x=n_seqs, y=goods)) + 
+  geom_point() + 
+  geom_hline(yintercept = 99, color = "red") + 
+  labs(x = "Depth", y = "Goods coverage", title = "Goods coverage")
+
+#set depth to 2449 
+depth = 2449
+
+coverage_stat %>%ggplot(aes(x=n_seqs, y=goods)) + 
+  geom_point() + 
+  geom_hline(yintercept = 99, color = "red") + 
+  geom_label(data = data.frame(n_seqs = c(60000,8000), 
+                               goods = c(98, 80), 
+                               label = c("99 Goods coverage", "Rarefy depth")), 
+             aes(label = label)) + 
+  geom_vline(xintercept = depth, color = "black") + 
+  labs(x = "Depth", y = "Goods coverage", title = "Goods coverage")
+
+rarecurve_data = rarecurve(ft_decontam, step = 50, tidy = T)
+rarecurve_data %>% ggplot(aes(x=Sample, y=Species, group=Site)) + 
+  geom_line(alpha = 0.3) + 
+  geom_vline(xintercept = depth, color = "black") + 
+  geom_label(data = data.frame(Sample = c(2000), 
+                               Species = c(300), 
+                               Site = "",
+                               label = c("Rarefy depth")), 
+             aes(label = label)) + 
+  labs(x = "Depth", y = "Number of ASVs") + 
+  coord_cartesian(xlim = c(0,5000)) 
+
+phylo_decomtan_rf = rarefy_even_depth(phylo_decomtan, 
+                                      sample.size = depth, 
+                                      rngseed = 3, 
+                                      replace = F) %>%
+  subset_samples(!Sample_or_Blank)
+  
+```
+
+### diversity
+```{r}
+
+ft = t((subset_samples(phylo_decomtan, !Sample_or_Blank))@otu_table@.Data)
+
+ft_list = ft %>% 
+  as.data.frame() %>% rownames_to_column(var = "SampleID") %>%
+  pivot_longer(-SampleID, names_to = "ASV", values_to = "count") %>%
+  filter(count > 0) %>% split(., .$SampleID)
+
+asv_count_df = ft_list[[2]]
+phylotree = phylo_decomtan@phy_tree
+
+alpha_diversity_bootstrap = function(asv_count_df, phylotree, depth, n=100){
+  alpha_diversity_sample = function(asv_count_df, phylotree, seed, depth){
+      all_asv_count = rep(asv_count_df$ASV, asv_count_df$count)
+      set.seed(seed)
+      boot_asv = sample(all_asv_count, size = depth, replace = T)
+      boot_dat = table(boot_asv) %>% as.matrix() 
+      colnames(boot_dat) = "count"
+      faith = pd(t(boot_dat), phylotree, include.root = F)$PD
+      observed = nrow(boot_dat)
+      shannon = diversity(boot_dat, index = "shannon")
+      evenness = shannon/log(observed)
+      data.frame(faith = faith, observed = observed, shannon = shannon, evenness = evenness)
+  }
+  if (sum(asv_count_df$count) < depth){
+    c(faith = NA, observed = NA, shannon = NA, evenness = NA)
+  }else{
+    map_dfr(c(1:n), alpha_diversity_sample, 
+                      asv_count_df = asv_count_df, phylotree = phylotree, 
+                      depth = depth,
+            .id = NULL) %>% colMeans()
+    }
+}
+
+#alpha_diversity_bootstrap_p = function(asv_count_df, phylotree, depth, n=100){
+#  alpha_diversity_sample = function(asv_count_df, phylotree, seed, depth){
+#      all_asv_count = rep(asv_count_df$ASV, asv_count_df$count)
+#      set.seed(seed)
+#      boot_asv = sample(all_asv_count, size = depth, replace = T)
+#      boot_dat = table(boot_asv) %>% as.matrix() 
+#      colnames(boot_dat) = "count"
+#      faith = pd(t(boot_dat), phylotree, include.root = F)$PD
+#      observed = nrow(boot_dat)
+#      shannon = diversity(boot_dat, index = "shannon")
+#      evenness = shannon/log(observed)
+#      data.frame(faith = faith, observed = observed, shannon = shannon, evenness = evenness)
+#  }
+#  if (sum(asv_count_df$count) < depth){
+#    c(faith = NA, observed = NA, shannon = NA, evenness = NA)
+#  }else{
+#   future_map_dfr(c(1:n), alpha_diversity_sample, 
+#                      asv_count_df = asv_count_df, phylotree = phylotree, 
+#                      depth = depth,
+#            .id = NULL, .progress = F, .options = furrr_options(seed=NULL)) %>% colMeans()
+#    }
+#}
+
+
+plan(multisession)
+#system.time(a <- alpha_diversity_bootstrap(asv_count_df, phylotree, depth, n=100))
+#system.time(b <- alpha_diversity_bootstrap_p(asv_count_df, phylotree, depth, n=100))
+#sum(a == b)
+
+#system.time(a <- map_dfr(ft_list, alpha_diversity_bootstrap, 
+#                         phylotree = phylotree, depth = depth, n = 10,
+#            .id = "SampleID"))
+
+#system.time(b <- future_map_dfr(ft_list, alpha_diversity_bootstrap, 
+#                                phylotree = phylotree, depth = depth, n = 10, 
+#                                .id = "SampleID", .progress = F,
+#                                .options = furrr_options(seed=NULL)))
+#colSums(a == b, na.rm = T)
+#parallel in outside function works best
+plan(multisession)
+system.time(aa <- future_map_dfr(ft_list, alpha_diversity_bootstrap, 
+                                phylotree = phylotree, depth = depth, n = 1000, 
+                                .id = "SampleID", .progress = F,
+                                .options = furrr_options(seed=NULL)))
+alpha_p = aa %>% filter(!is.na(faith)) %>%
+  select(SampleID, Faith_PD=faith, Observed_ASVs=observed, Shannon_Index=shannon, Pielou_evenness=evenness)
+
+#alpha from a rarefied table
+a1 = pd(t(phylo_decomtan_rf@otu_table@.Data), phylo_decomtan_rf@phy_tree, include.root = F)
+a2 = estimate_richness(phylo_decomtan_rf, measures="Shannon")
+alpha = merge(a1, a2, by=0)
+names(alpha) = c("SampleID","Faith_PD", "Observed_ASVs","Shannon_Index")
+alpha$Pielou_evenness = alpha$Shannon_Index/log(alpha$Observed_ASVs)
+
+#rarefy table or bootstrap have similar results, I prefer bootstrap alpha
+alpha_test = inner_join(alpha, alpha_p, by = "SampleID")
+alpha_test %>% mutate(faith_diff = Faith_PD.x - Faith_PD.y,
+                      observed_diff = Observed_ASVs.x - Observed_ASVs.y,
+                      shannon_diff = Shannon_Index.x - Shannon_Index.y,
+                      evenness_diff = Pielou_evenness.x - Pielou_evenness.y) %>%
+  select(SampleID, ends_with("diff")) %>% 
+  pivot_longer(-SampleID, names_to = "Metrics", values_to = "difference") %>% 
+  mutate(Metrics = str_remove(Metrics,"_diff")) %>% 
+  ggplot(aes(y = difference)) + 
+    geom_boxplot() + 
+    facet_wrap(~ Metrics, nrow = 2, scales = "free_y")
+
+#beta
+DM_bray = avgdist(ft, 
+                  dmethod = "bray", sample = depth, iterations = 1000)
+DM_jaccard = avgdist(ft, 
+                  dmethod = "jaccard", sample = depth, iterations = 1000)  
+```
+
+```{r}
+rm(a1, a2, aa,a, contamdf, contam_id, coverage_stat, FR, ft_decontam, rarecurve_data,
+   ft, ft_list, asv_count_df, phylotree, alpha_diversity_bootstrap, alpha_diversity_bootstrap_p, 
+   alpha_test)
+```
+
+
+## save data
+```{r}
+#save.image( file = paste0(temp_out, "temp_16S.RData"))
+#load(file = "output/temp_16S.RData")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

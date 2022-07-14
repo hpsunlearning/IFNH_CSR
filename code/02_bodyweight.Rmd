@@ -1,0 +1,308 @@
+---
+title: "draft"
+author: "Haipeng Sun"
+date: "1/10/2022"
+output: html_document
+---
+
+## library
+```{r setup, message=FALSE, warning=FALSE}
+library(knitr)
+library(readxl)
+library(phyloseq)
+library(qiime2R)
+library(picante)
+library(Hmisc)
+library(usedist)
+library(grid)
+library(gridExtra)
+library(gtable)
+library(lme4)
+library(lmerTest)
+library(nlme)
+library(sjPlot)
+library(tidyverse)
+```
+
+## load data
+```{r}
+load(file = "output/temp_16S.RData")
+theme_custom =  theme_bw() + theme(panel.background = element_rect(fill = NA), 
+                                   text = element_text(face = 'bold', color = "black"),
+                                   axis.text = element_text(size = 12, color = "black"),
+                                   axis.title = element_text(size = 14),
+                                   legend.text = element_text(size= 14),
+                                   legend.title = element_text(size= 14))
+
+```
+
+## plot data
+### bodyweight
+```{r}
+p = ggplot(BW, aes(x = TimePoint_Weeks, color = BirthMode)) +
+  geom_point(aes(y = Weight_g), size = 0.5, alpha = 0.7) +
+  geom_path(aes(y = Weight_g , group = MouseID), size = 0.3, alpha = 0.3) + 
+  geom_ribbon(data = BW_sum, alpha = 0.5, size = 0.1,
+              aes(x = TimePoint_Weeks, ymin = boot.lo, ymax = boot.hi, 
+                  group = BirthMode, color = BirthMode, fill = BirthMode)) + 
+  geom_path(data = BW_sum, aes(x = TimePoint_Weeks, y = Mean, group = BirthMode)) + 
+  facet_grid(.~Sex, labeller = labeller(Sex = Sex_labs)) +
+  scale_x_continuous(breaks = c(1:18)) + 
+  scale_color_manual(values = BirthMode_color, aesthetics = c("fill", "colour")) +
+  labs(x = "Age (Week)", y = "Body Weight (g)", title = "") + 
+  theme_custom
+ggsave(filename = paste0(temp_out,"BW/body_weight_overall.pdf"), plot = p,
+    width = 10, height = 5, units = "in", dpi = 300)
+```
+
+### plot BWgain
+```{r}
+p = ggplot(BWgain, aes(x = TimePoint_Weeks, color = BirthMode)) +
+  geom_point(aes(y = BW_gain),size = 0.5, alpha = 0.7) +
+  geom_path(aes(y = BW_gain, group = MouseID), size = 0.3, alpha = 0.2) +
+  geom_ribbon(data = BWgain_sum, alpha = 0.3, size = 0.1,
+              aes(x = TimePoint_Weeks, ymin = boot.lo, ymax = boot.hi, 
+                  group = BirthMode, color = BirthMode, fill = BirthMode)) + 
+  geom_path(data = BWgain_sum, aes(x = TimePoint_Weeks, y = Mean, group = BirthMode)) + 
+  facet_grid(.~Sex,labeller = labeller(Sex = Sex_labs)) +
+  scale_x_continuous(breaks = c(4:18)) +
+  scale_color_manual(values = BirthMode_color, aesthetics = c("fill", "colour")) +
+  labs(x = "Age (Week)", y = "Body Weight gain (g)", title = "") + 
+  theme_custom
+ggsave(filename = paste0(temp_out,"BW/body_weight_gain_overall.pdf"), plot = p,
+    width = 10, height = 5, units = "in", dpi = 300)
+
+p = ggplot(BWgain, aes(x = TimePoint_Weeks, color = BirthMode)) +
+  geom_point(aes(y = BW_gain_percent), size = 0.5, alpha = 0.7) +
+  geom_path(aes(y = BW_gain_percent, group = MouseID), size = 0.3, alpha = 0.2) +
+  geom_ribbon(data = BWgain_sum, alpha = 0.3, size = 0.1,
+              aes(x = TimePoint_Weeks, ymin = boot_p.lo, ymax = boot_p.hi, 
+                  group = BirthMode, color = BirthMode, fill = BirthMode)) + 
+  geom_path(data = BWgain_sum, aes(x = TimePoint_Weeks, y = Mean_p, group = BirthMode)) + 
+  facet_grid(.~Sex,labeller = labeller(Sex = Sex_labs)) +
+  scale_x_continuous(breaks = c(4:18)) + 
+  scale_y_continuous(breaks = c(1, 1.5, 2, 2.5, 3, 3.5, 4), labels = scales::percent) +
+  scale_color_manual(values = BirthMode_color, aesthetics = c("fill", "colour")) +
+  labs(x = "Age (Week)", y = "Body Weight gain (%)", title = "") + 
+  theme_custom
+ggsave(filename = paste0(temp_out,"BW/body_weight_gain_percent_overall.pdf"), plot = p,
+    width = 10, height = 5, units = "in", dpi = 300)
+```
+
+## LMM model
+### test
+```{r}
+
+```
+
+
+### LMM all
+```{r}
+plot_model_fit_table <- function(model, a_tab, terms = c("TimePoint_Weeks","BirthMode"), output, xlab, ylab, ...){
+  p = plot_model(model, type = "pred", terms = terms,
+               colors = BirthMode_color, ci.lvl = .95)
+  xmin = ggplot_build(p)$layout$panel_scales_x[[1]]$range$range[1]
+  xmax = ggplot_build(p)$layout$panel_scales_x[[1]]$range$range[2]
+  ymin = ggplot_build(p)$layout$panel_scales_y[[1]]$range$range[1]
+  ymax = ggplot_build(p)$layout$panel_scales_y[[1]]$range$range[2]
+  p1 = plot_model(model, type = "pred", terms = terms,
+               colors = BirthMode_color, ci.lvl = .95) + 
+    scale_x_continuous(breaks = seq(from = 1, to = 18, by = 2)) + 
+    scale_y_continuous(limits = c(ymin, ymax + (ymax - ymin)* 0.3)) + 
+    labs(x = xlab, y = ylab, title = "") + 
+    theme_custom + theme(panel.background = element_rect(fill = NA))
+  p1 = p1 + annotation_custom(grob = tableGrob(a_tab, 
+                                             theme = ttheme_minimal(base_size = 8)),
+                     xmin = xmin, xmax = xmax, 
+                     ymin = ymax, 
+                     ymax = ymax + (ymax - ymin)* 0.3)
+  ggsave(filename = output, plot = p1,
+    width = 7, height = 5, units = "in", dpi = 300)
+}
+
+lmm_model_lme4 <- function(x, dir, ...){
+  dat <- x$dat
+  S <- x$Sex
+  if(dat=="Weight_g"){
+    wdat = BW %>% filter(Sex == S)
+    ylab <- "Body Weight (g)"
+  }else{
+    wdat = BWgain %>% filter(Sex == S)
+    ylab = ifelse(dat == "BW_gain", "Body Weight Gain (g)","Body Weight Gain (%)")
+  }
+  fo <- paste0(dat, " ~ TimePoint_Weeks*BirthMode + (TimePoint_Weeks|MouseID)") %>% 
+      as.formula()
+  m <- lmer(fo, data = wdat,
+            control = lmerControl(optimizer ="Nelder_Mead"), REML = F)
+  a_tab <- anova(m) %>% as.data.frame() %>% 
+      mutate(`Sum Sq` = round(`Sum Sq`,2),
+             `Mean Sq` = round(`Mean Sq`,2),
+             DenDF = round(DenDF,2),
+             `F value` = round(`F value`,4),
+             `Pr(>F)` = round(`Pr(>F)`,4))
+  output <- paste0(dir,"LMM_", dat, "_in_", S, "_lme4.pdf")
+  plot_model_fit_table(model = m, a_tab = a_tab,
+                       terms = c("TimePoint_Weeks","BirthMode"), 
+                       output = output, 
+                       xlab = "Age (Week)", 
+                       ylab = ylab)
+} 
+
+lmm_model_nlme <- function(x, dir, ...){
+  dat <- x$dat
+  S <- x$Sex
+  if(dat=="Weight_g"){
+    wdat = BW %>% filter(Sex == S)
+    ylab <- "Body Weight (g)"
+  }else{
+    wdat = BWgain %>% filter(Sex == S)
+    ylab = ifelse(dat == "BW_gain", "Body Weight Gain (g)","Body Weight Gain (%)")
+  }
+  fo <- paste0(dat, " ~ TimePoint_Weeks*BirthMode") %>% as.formula()
+  m <- lme(fo, random = ~ 1 + TimePoint_Weeks|MouseID, 
+            data = wdat)
+  a_tab <- anova(m) %>%  filter(rownames(.) != "(Intercept)") %>% 
+      mutate(`F-value` = round(`F-value`,4),
+             `p-value` = round(`p-value`,4))
+  output <- paste0(dir,"LMM_", dat, "_in_", S, "_nlme.pdf")
+  plot_model_fit_table(model = m, a_tab = a_tab,
+                       terms = c("TimePoint_Weeks","BirthMode"), 
+                       output = output, 
+                       xlab = "Age (Week)", 
+                       ylab = ylab)
+}
+dir = paste0(temp_out,"BW/")
+data = list(Sex = c("M", "F"), dat = c("Weight_g", "BW_gain", "BW_gain_percent")) %>% cross()
+map(data, lmm_model_lme4, dir = dir)
+
+#map(data, lmm_model_nlme, dir = dir) #first time run error: object 'fo' not found
+
+```
+
+
+### LMM explore
+```{r}
+fit = lm(Weight_g ~ TimePoint_Weeks*BirthMode + Sex + LitterSize_Born, data = BW)
+summary(fit)
+fit_lme4 = lmer(Weight_g ~ TimePoint_Weeks*BirthMode + Sex + LitterSize_Born + (TimePoint_Weeks|MouseID), 
+                data = BW,
+                        control = lmerControl(optimizer ="Nelder_Mead"), REML = F)
+summary(fit_lme4)
+fit_nlme = lme(Weight_g ~ TimePoint_Weeks*BirthMode + Sex + LitterSize_Born, 
+               random = ~ 1 + TimePoint_Weeks|MouseID, data = BW)
+summary(fit_nlme)
+
+fitgain = lm(BW_gain ~ TimePoint_Weeks*BirthMode + Sex + LitterSize_Born, data = BWgain)
+summary(fitgain)
+fitgain_lme4 = lmer(BW_gain ~ TimePoint_Weeks*BirthMode + Sex + LitterSize_Born + (TimePoint_Weeks|MouseID), data = BWgain,
+                        control = lmerControl(optimizer ="Nelder_Mead"), REML = F)
+summary(fitgain_lme4)
+fitgain_nlme = lme(BW_gain ~ TimePoint_Weeks*BirthMode + Sex + LitterSize_Born, 
+               random = ~ 1 + TimePoint_Weeks|MouseID, data = BWgain)
+summary(fitgain_nlme)
+
+fitgainp = lm(BW_gain_percent ~ TimePoint_Weeks*BirthMode + Sex + LitterSize_Born, data = BWgain)
+summary(fitgainp)
+fitgainp_lme4 = lmer(BW_gain_percent ~ TimePoint_Weeks*BirthMode+ LitterSize_Born + Sex + (TimePoint_Weeks|MouseID), data = BWgain,
+                        control = lmerControl(optimizer ="Nelder_Mead"), REML = F)
+summary(fitgainp_lme4)
+fitgainp_nlme = lme(BW_gain_percent ~ TimePoint_Weeks*BirthMode + Sex + LitterSize_Born, 
+                    random = ~ 1 + TimePoint_Weeks|MouseID, data = BWgain)
+summary(fitgainp_nlme)
+```
+
+## responder on percentile
+```{r}
+library(gamlss)
+library(rsample)
+library(rlist)
+```
+
+### percentile calculate
+```{r}
+
+BW_f = BW %>% filter(Sex == "F") %>% dplyr::select(Weight_g, TimePoint_Weeks)
+centile_BW_f_model =  lms(Weight_g, TimePoint_Weeks, data = BW_f, families = "BCT")
+BW_f_centile = centiles.pred(centile_BW_f_model, xname = "TimePoint_Weeks", 
+                             xvalues = c(4:18), cent=c(15, 20, 25, 50, 75, 80, 85)) 
+
+BW_m = BW %>% filter(Sex == "M") %>% dplyr::select(Weight_g, TimePoint_Weeks) 
+centile_BW_m_model =  lms(Weight_g, TimePoint_Weeks, data = BW_m, families = "BCT")
+BW_m_centile = centiles.pred(centile_BW_m_model, xname = "TimePoint_Weeks", 
+                             xvalues = c(4:18), cent=c(15, 20, 25, 50, 75, 80, 85)) 
+
+```
+
+### BW status 
+```{r}
+at_week15 = BW %>% filter(TimePoint_Weeks == 15) %>% 
+  mutate(BW_status = 
+         case_when(Sex == "F" & Weight_g < BW_f_centile[which(BW_f_centile$x == 15), "20"] ~ "Underweight",
+                   Sex == "M" & Weight_g < BW_m_centile[which(BW_m_centile$x == 15), "20"] ~ "Underweight",
+                   Sex == "F" & Weight_g <= BW_f_centile[which(BW_f_centile$x == 15), "80"] ~ "Normal",
+                   Sex == "M" & Weight_g <= BW_m_centile[which(BW_m_centile$x == 15), "80"] ~ "Normal",
+                   Sex == "F" & Weight_g > BW_f_centile[which(BW_f_centile$x == 15), "80"] ~ "Overweight",
+                   Sex == "M" & Weight_g > BW_m_centile[which(BW_m_centile$x == 15), "80"] ~ "Overweight"),
+         Overweight = ifelse(BW_status == "Overweight", "Yes", "zNo"),
+         Underweight = ifelse(BW_status == "Underweight", "Yes", "zNo")
+         )
+
+save(BW_f_centile, BW_m_centile, at_week15,
+     file = paste0(temp_out, "temp_BW_responder.RData"))
+```
+
+### plot
+```{r}
+
+
+
+
+
+```
+
+
+### test
+```{r}
+library(epiR)
+
+tab_f_CS_VF = at_week15 %>% filter(Sex == "F", BirthMode != "CSR") %>% 
+  mutate(BirthMode = as.character(BirthMode)) %>% 
+  dplyr::select(BirthMode, Overweight) %>% table() 
+epi.2by2(dat = tab_f_CS_VF, method = "cohort.count", digits = 2)
+
+tab_f_CSR_VF = at_week15 %>% filter(Sex == "F", BirthMode != "CS") %>% 
+  mutate(BirthMode = as.character(BirthMode)) %>%
+  dplyr::select(BirthMode, Overweight) %>% table() 
+epi.2by2(dat = tab_f_CSR_VF, method = "cohort.count", digits = 2)
+
+tab_f = at_week15 %>% filter(Sex == "F") %>% 
+  dplyr::select(BirthMode, Overweight) %>% table()
+fisher.test(tab_f)
+
+
+tab_m_CS_VF = at_week15 %>% filter(Sex == "M", BirthMode != "CSR") %>% 
+  mutate(BirthMode = as.character(BirthMode)) %>% 
+  dplyr::select(BirthMode, Overweight) %>% summarise(n = n())
+epi.2by2(dat = tab_f_CS_VF, method = "cohort.count", digits = 2)
+
+tab_m_CSR_VF = at_week15 %>% filter(Sex == "M", BirthMode != "CS") %>% 
+  mutate(BirthMode = as.character(BirthMode)) %>%
+  dplyr::select(BirthMode, Overweight) %>% table() 
+epi.2by2(dat = tab_f_CSR_VF, method = "cohort.count", digits = 2)
+
+tab_m = at_week15 %>% filter(Sex == "M") %>% 
+  dplyr::select(BirthMode, Overweight) %>% table()
+fisher.test(tab_m)
+```
+
+
+
+
+
+
+
+
+
+
+
+
