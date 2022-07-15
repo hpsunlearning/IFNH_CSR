@@ -131,7 +131,7 @@ cal_unifrac_dist_rarefy_bootstrap <- function(psdata, depth, n, block_size = 100
 #system.time(aa_4 <- cal_unifrac_dist_rarefy_bootstrap(psdata = phylo_decomtan, depth = depth, n = 11, block_size = 3))
 #   user  system elapsed 
 #  9.647   0.543 173.396 
-#system.time(aa_5 <- cal_unifrac_dist_rarefy_bootstrap(psdata = phylo_decomtan, depth = depth, n = 11, block_size = 15))
+#system.time(aa_5 <- cal_unifrac_dist_rarefy_bootstrap(psdata = phylo_decomtan, depth = depth, n = 10, block_size = 100))
 #   user  system elapsed 
 #  7.985   0.397 135.142 
 #res <- inner_join(aa_5, aa_4, by = c("Sample1","Sample2","Metric")) %>%  
@@ -146,23 +146,30 @@ cal_unifrac_dist_rarefy_bootstrap <- function(psdata, depth, n, block_size = 100
 
 ### calculate distance
 ```{r}
-psdata <- subset_samples(phylo_decomtan, !Sample_or_Blank)
+#psdata <- subset_samples(phylo_decomtan, !Sample_or_Blank)
 
-plan(multisession)  
-system.time(unif_two <- cal_unifrac_dist_rarefy_bootstrap(psdata = psdata, depth = depth, 
-                                                          n = 1000, block_size = 1000))
-DM_uu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "uu"), Sample1, Sample2, value) %>% as.dist()
-DM_wu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "wu"), Sample1, Sample2, value) %>% as.dist()
+#plan(multisession)  
+#system.time(unif_two <- cal_unifrac_dist_rarefy_bootstrap(psdata = psdata, depth = depth,                                                           n = 1000, block_size = 100))
+#    user    system   elapsed 
+#603.109    29.838 10067.601 
+#DM_uu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "uu"), Sample1, Sample2, value) %>% as.dist()
+#DM_wu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "wu"), Sample1, Sample2, value) %>% as.dist()
 
-ft = t(psdata@otu_table@.Data)
-system.time(DM_bray <- avgdist(ft,dmethod = "bray", sample = depth, iterations = 10))
-system.time(DM_jaccard <- avgdist(ft,dmethod = "jaccard", sample = depth, iterations = 10))
+#ft = t(psdata@otu_table@.Data)
+#system.time(DM_bray <- avgdist(ft,dmethod = "bray", sample = depth, iterations = 1000))
+#   user  system elapsed 
+#554.705   8.692 641.780 
+#system.time(DM_jaccard <- avgdist(ft,dmethod = "jaccard", sample = depth, iterations = 1000))
+#   user  system elapsed 
+#547.209  10.310 604.054 
 ```
 
 ## save data
 ```{r}
-#save( ,file = "../data/beta.RData")
-#load(file = "output/temp_16S.RData")
+#save(DM_uu,file = "../data/beta_DM_uu.RData")
+#save(DM_wu,file = "../data/beta_DM_wu.RData")
+#save(DM_bray,file = "../data/beta_DM_bray.RData")
+#save(DM_jaccard,file = "../data/beta_jaccard.RData")
 ```
 
 
