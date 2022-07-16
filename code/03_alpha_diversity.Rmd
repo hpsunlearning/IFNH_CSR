@@ -13,13 +13,13 @@ library(purrr)
 library(furrr)
 library(picante)
 library(vegan)
+library(MASS)
 library(tidyverse)
 ```
 
 ## load data
 ```{r}
 load(file = "../data/BW_and_phylo.RData")
-temp_out = "../result/alpha/"
 ```
 
 ## rarefy to the depth
@@ -98,7 +98,67 @@ alpha_test %>% pivot_longer(-SampleID, names_to = c("Metrics", "Method"), names_
 #use bootstrapped alpha for further study
 alpha = alpha_boot
 #save(alpha, file = "../data/alpha.RData")
-#load(file = "../data/alpha.RData")
+```
+
+## load data
+```{r}
+load(file = "../data/alpha.RData")
+temp_out = "../result/alpha/"
+dat_alpha <- left_join(alpha, meta_all, by = "SampleID")
+
+theme_custom <- theme_bw() + theme(panel.background = element_rect(fill = NA), 
+                                   text = element_text(face = 'bold', color = "black", size = 14))
+```
+
+## alpha expolore mom vaginal
+```{r}
+g <- dat_alpha %>% mutate(grp = case_when(TimePoint == "Week3" ~ "pups week3",
+                                      TimePoint == "Week6" ~ "pups week6",
+                                      TimePoint == "Week9-14" ~ "pups week9-14",
+                                      TimePoint == "Week18" ~ "pups week18",
+                                      BodySite == "Vaginal" ~ "moms at birth")) %>%
+  mutate(grp = factor(grp, levels = c("moms at birth","pups week3",
+                                       "pups week6","pups week9-14","pups week18"),
+                       ordered = TRUE)) %>% 
+  select(SampleID,grp,BodySite,Faith_PD,Observed_ASVs,Shannon_Index,Pielou_evenness) %>% 
+  pivot_longer(c(Faith_PD:Pielou_evenness), names_to = "Metrics") %>%
+  ggplot(aes(x=grp, y=value)) + 
+  geom_boxplot(aes(color=BodySite, fill=BodySite), alpha = 0.3, outlier.alpha = 0) + 
+  geom_point(aes(color=BodySite), position = position_dodge2(width = 0.2)) + 
+  scale_color_manual(values = c("Feces"="#7fc97f","Vaginal"="#beaed4"), 
+                     aesthetics = c("color","fill")) + 
+  labs(x="",y="", tittle="") + 
+  facet_wrap(~ Metrics, nrow = 2, scales = "free_y") + 
+  theme_bw() + theme(aspect.ratio = 0.8,
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=90),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))
+
+ggsave(filename = paste0(temp_out,"vaginal_fecal_by_timepoint.pdf"), device = cairo_pdf, 
+         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+```
+
+## alpha effect of birthmode
+```{r}
+dat_alpha_pup <- dat_alpha %>% filter(Generation=="F1")
+metric <- names(alpha)[2:5]
+
+fit.null <- lm(as.formula(paste0(metric[4], " ~ 1")), data=dat_alpha_pup) 
+fit.full <- lm(as.formula(paste0(metric[4], " ~ BirthMode + Sex + TimePointInWeeks")),
+               data=dat_alpha_pup)
+regforward.out <- stepAIC(fit.null, scope = ~ BirthMode + Sex + TimePointInWeeks,
+                          direction = "forward", trace = 10)
+
+
+
+
+
 ```
 
 
