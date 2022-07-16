@@ -13,14 +13,9 @@ library(usedist)
 library(purrr)
 library(furrr)
 library(vegan)
-library(data.table)
+library(ape)
+library(MicEco)
 library(tidyverse)
-```
-
-## load data
-```{r}
-load(file = "../data/BW_and_phylo.RData")
-temp_out = "../result/beta/"
 ```
 
 ## rarefy to the depth 
@@ -47,8 +42,6 @@ cal_unifrac_dist_long <- function(rarified_psdata){
                  names_to = "Metric") %>% 
     mutate(Metric = ifelse(Metric=="Distance.x", "uu","wu"))
   dist_tbl
-  #dist_uu = pivot_to_numeric_matrix(dist_tbl %>% filter(Metric == "uu"), Sample1, Sample2, value) %>% as.dist()
-  #dist_wu = pivot_to_numeric_matrix(dist_tbl %>% filter(Metric == "wu"), Sample1, Sample2, value) %>% as.dist()
 }
 
 cal_unifrac_dist_rarefy <- function(psdata, depth, rngseed){
@@ -59,7 +52,7 @@ cal_unifrac_dist_rarefy <- function(psdata, depth, rngseed){
 }
 
 cal_unifrac_dist_rarefy_chunk <- function(psdata, depth, int_list){
-
+  require(data.table)
   res_long <- future_map_dfr(int_list, cal_unifrac_dist_rarefy, 
                                 psdata = psdata, depth = depth, 
                                 .id = "N", .progress = F,
@@ -144,8 +137,10 @@ cal_unifrac_dist_rarefy_bootstrap <- function(psdata, depth, n, block_size = 100
 
 ```
 
-### calculate distance
+### calculate distance (only run one time)
 ```{r}
+#load(file = "../data/BW_and_phylo.RData")
+#temp_out = "../result/beta/"
 #psdata <- subset_samples(phylo_decomtan, !Sample_or_Blank)
 
 #plan(multisession)  
@@ -162,17 +157,58 @@ cal_unifrac_dist_rarefy_bootstrap <- function(psdata, depth, n, block_size = 100
 #system.time(DM_jaccard <- avgdist(ft,dmethod = "jaccard", sample = depth, iterations = 1000))
 #   user  system elapsed 
 #547.209  10.310 604.054 
-```
 
-## save data
-```{r}
 #save(DM_uu,file = "../data/beta_DM_uu.RData")
 #save(DM_wu,file = "../data/beta_DM_wu.RData")
 #save(DM_bray,file = "../data/beta_DM_bray.RData")
 #save(DM_jaccard,file = "../data/beta_jaccard.RData")
 ```
 
+## load save data
+```{r}
+load(file = "../data/BW_and_phylo.RData")
+load(file = "../data/beta_DM_uu.RData")
+load(file = "../data/beta_DM_wu.RData")
+load(file = "../data/beta_DM_bray.RData")
+load(file = "../data/beta_jaccard.RData")
+temp_out = "../result/beta/"
+```
 
+## over all explore
+```{r}
+wdist <- DM_uu
+wmeta = meta_all %>% filter(SampleID %in% labels(wdist))
+
+
+
+## ape::pcoa
+wpcoa <- pcoa(wdist)
+varPC1 <- round(wpcoa$values$Relative_eig[1]*100, 2)
+varPC2 <- round(wpcoa$values$Relative_eig[2]*100, 2)
+varPC3 <- round(wpcoa$values$Relative_eig[3]*100, 2)
+wdat = merge(wpcoa$vectors[,1:2],meta_all, by.x = 0, by.y = "SampleID", all.x = T)  
+
+
+## vegan::capscale
+aa <- capscale(wdist ~ Sex + BodySite, data = wmeta)
+
+
+
+## vegan::metaMDS
+
+
+
+
+
+
+
+
+```
+
+## effect of birthmode on pups
+```{r}
+
+```
 
 
 
