@@ -11,12 +11,7 @@ library(knitr)
 library(readxl)
 library(phyloseq)
 library(qiime2R)
-#library(picante)
 library(Hmisc)
-#library(usedist)
-#library(purrr)
-#library(furrr)
-#library(picante)
 library(vegan)
 library(tidyverse)
 ```
@@ -31,6 +26,7 @@ metafile = "MasterMetadata-CS-SW-20220623-hs.xlsx"
 BirthMode_color = c("VF"="#377EB8", "CSR"="#4DAF4A", "CS"="#E41A1C")
 Sex_labs = c("F" = "Female", "M" = "Male")
 responder_color = c("Responder"="#d95f0e", "Nonresponder"="gray50")
+TimePoint_color = c("Week3"="#c7e9b4", "Week6"="#7fcdbb", "Week9-14"="#41b6c4", "Week18"="#2c7fb8")
 BW_status_color = c("Overweight"="#7570b3", "Normal"="#b3cde3","Underweight"="#66a61e")
 ```
 
