@@ -6,7 +6,6 @@ output: html_document
 ---
 
 ## library
-
 ```{r setup, message=FALSE, warning=FALSE}
 library(knitr)
 library(phyloseq)
@@ -19,8 +18,7 @@ library(tidyverse)
 ```
 
 ## rarefy to the depth (only run one time)
-
-```{r}
+```{r eval=FALSE, include=TRUE}
 load(file = "../data/BW_and_phylo.RData")
 
 ft = t((subset_samples(phylo_decomtan, !Sample_or_Blank))@otu_table@.Data)
@@ -97,16 +95,15 @@ alpha = alpha_boot
 ```
 
 ## load data
-
 ```{r}
 load(file = "../data/BW_and_phylo.RData")
 load(file = "../data/alpha.RData")
+load(file = "../data/BW_responder.RData")
 temp_out = "../result/alpha/"
 dat_alpha <- left_join(alpha, meta_all, by = "SampleID")
 ```
 
 ## alpha expolore mom vaginal
-
 ```{r}
 g <- dat_alpha %>% mutate(grp = case_when(TimePoint == "Week3" ~ "week3",
                                       TimePoint == "Week6" ~ "week6",
@@ -141,9 +138,7 @@ ggsave(filename = paste0(temp_out,"vaginal_fecal_by_timepoint.pdf"), device = ca
 ```
 
 ## effect of birthmode on pups
-
 ### linear model
-
 ```{r}
 linear_model <- function(data, x, y) {
   #input data, respond variable y, variable formula
@@ -184,7 +179,6 @@ write.csv(rbind(all_res[[1]]$anova,all_res[[2]]$anova,all_res[[3]]$anova,all_res
 ```
 
 ### compare birthmode
-
 ```{r}
 comp_kw_aov = function(wdat, x, y){
   #input data, respond variable y, categorize variable x
@@ -207,7 +201,6 @@ comp_kw_aov = function(wdat, x, y){
 
 dat_alpha_pup <- dat_alpha %>% filter(Generation=="F1")
 metric <- names(alpha)[2:5]
-
 ###TimePointInWeeks
 lst_df <- expand.grid(dat_alpha_pup$Sex %>% unique(), 
                        dat_alpha_pup$TimePointInWeeks %>% unique(), 
@@ -313,6 +306,68 @@ ggsave(filename = paste0(temp_out,"pup_by_sex_by_timepoint.pdf"), device = cairo
          plot = g, width = 7, height = 6, units = "in", dpi = 300)
 ```
 
+## overweight 
+```{r}
+dat <- dat_alpha %>% left_join(at_week15 %>% select(MouseID, BW_status, Overweight, Underweight), 
+                        by = "MouseID") %>% filter(!is.na(BW_status)) 
+metric <- names(alpha)[2:5]
+
+all_res <-lapply(metric, function(y){
+  linear_model(data = dat, y = y,
+                  x = "Overweight + Sex + BirthMode + TimePoint")
+})
+write.csv(rbind(all_res[[1]]$coef,all_res[[2]]$coef,all_res[[3]]$coef,all_res[[4]]$coef),
+          file = paste0(temp_out,"lm_coef_overweight_res.csv"), row.names = FALSE)
+write.csv(rbind(all_res[[1]]$anova,all_res[[2]]$anova,all_res[[3]]$anova,all_res[[4]]$anova),
+          file = paste0(temp_out,"lm_anova_overweight_res.csv"), row.names = FALSE)
+
+lst_df <- expand.grid(dat$TimePoint %>% unique(), 
+                      metric, stringsAsFactors = F)
+names(lst_df) <- c("TimePoint","Metrics")
+
+plan(multisession)
+all_res <- future_map_dfr(1:nrow(lst_df), function(n){
+  wdat <- dat %>% filter(TimePoint == lst_df[n,"TimePoint"])
+  res <- comp_kw_aov(wdat = wdat, x = "Overweight", y = lst_df[n,"Metrics"])
+  res$grp <- cbind(res$grp, lst_df[n,],row.names = NULL)
+  res$comp <- cbind(res$comp, lst_df[n,],row.names = NULL)
+  res
+})
+all_res$comp$KW_padj <- p.adjust(all_res$comp$KW_pvalue, method = "fdr")
+all_res$comp$aov_padj <- p.adjust(all_res$comp$aov_pvalue, method = "fdr")
+write.csv(all_res$grp, row.names = FALSE,
+          file = paste0(temp_out,"kw_aov_grp_overweight_by_TimePointInWeeks.csv"))
+write.csv(all_res$comp, row.names = FALSE,
+          file = paste0(temp_out,"kw_aov_comp_overweight_by_TimePointInWeeks.csv"))
+
+dat_long <- dat %>%
+  select(SampleID,Faith_PD,Observed_ASVs,Shannon_Index,Pielou_evenness, 
+         TimePoint, Sex, BirthMode, Overweight) %>% 
+  pivot_longer(c(Faith_PD:Pielou_evenness), names_to = "Metrics")
+g <- ggplot(dat_long, aes(x = TimePoint, y = value)) + 
+  geom_boxplot(aes(color = Overweight, fill = Overweight),
+               alpha = 0.3, outlier.alpha = 0) + 
+  geom_point(aes(color = Overweight), alpha = 0.7, size = 1,
+             position = position_dodge2(width = 0.6)) +
+  stat_compare_means(aes(group = Overweight), hide.ns = T, label =  "p.signif") +
+  scale_color_manual(values = c("Y"="#d73027", "N"="#1a9850"), 
+                     name = "Overweight",
+                     aesthetics = c("color","fill")) + 
+  labs(x="",y="", tittle="") + 
+  facet_wrap(~ Metrics, nrow = 2, scales = "free_y") + 
+  theme_bw() + theme(panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=10,color="black",face='bold'),
+                     axis.title = element_text(size=10,color="black",face='bold'),
+                     axis.text = element_text(size=10,color="black",face='bold'),
+                     axis.text.x = element_text(size=10,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=10,color="black",face='bold'),
+                     legend.text = element_text(size=10,color="black",face='bold'),
+                     legend.title = element_text(size=10,color="black",face='bold'),
+                     title = element_text(size=10,color="black",face='bold'))
+ggsave(filename = paste0(temp_out,"pup_Overweight_by_timepoint.pdf"), device = cairo_pdf, 
+         plot = g, width = 7, height = 6, units = "in", dpi = 300)
+
+```
 
 
 

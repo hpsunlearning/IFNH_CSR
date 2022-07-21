@@ -25,6 +25,7 @@ metafile = "MasterMetadata-CS-SW-20220623-hs.xlsx"
 # set colors, labs and so on
 BirthMode_color = c("VF"="#377EB8", "CSR"="#4DAF4A", "CS"="#E41A1C")
 Sex_labs = c("F" = "Female", "M" = "Male")
+Sex_color = c("F"="#e9a3c9", "M"="#a1d76a")
 responder_color = c("Responder"="#d95f0e", "Nonresponder"="gray50")
 TimePoint_color = c("Week3"="#c7e9b4", "Week6"="#7fcdbb", "Week9-14"="#41b6c4", "Week18"="#2c7fb8")
 BW_status_color = c("Overweight"="#7570b3", "Normal"="#b3cde3","Underweight"="#66a61e")
@@ -139,7 +140,7 @@ taxa = taxa %>% mutate(ASV = str_c("asv_", 1:nrow(taxa)),
 ```
 
 ### decontam
-```{r}
+```{r }
 library(decontam)
 
 contamdf = isContaminant(phylo_all, method="combined", conc="PCR_Conc",neg="Sample_or_Blank" )
@@ -149,7 +150,7 @@ taxa %>% filter(id %in% contam_id)
 ```
 
 ### rarefy depth
-```{r}
+```{r }
 cbind(sample_sums(phylo_all), sample_sums(phylo_decomtan)) %>% as.data.frame() %>% 
   rename(original=V1, decontamed=V2)%>%
   merge(., meta_all, by.x=0, by.y="SampleID") %>% 
@@ -214,7 +215,7 @@ phylo_decomtan_rf = rarefy_even_depth(phylo_decomtan,
 ```
 
 ## save data
-```{r}
+```{r eval=FALSE, include=TRUE}
 #rm(aa, contamdf, coverage_stat, FR, ft_decontam, rarecurve_data, sam_new, a, contam_id)
 #save.image(file = "../data/BW_and_phylo.RData")
 #load(file = "../data/BW_and_phylo.RData")

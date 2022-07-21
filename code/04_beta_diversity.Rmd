@@ -172,6 +172,7 @@ load(file = "../data/beta_DM_uu.RData")
 load(file = "../data/beta_DM_wu.RData")
 load(file = "../data/beta_DM_bray.RData")
 load(file = "../data/beta_DM_jaccard.RData")
+load(file = "../data/BW_responder.RData")
 temp_out = "../result/beta/"
 ```
 
@@ -235,7 +236,7 @@ for(dd in c("uu","wu","bray","jaccard")){
   ggsave(filename = paste0(temp_out,dd,"_","vaginal_fecal_by_timepoint_ape.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)  
   
-  ## vegan::capscale
+  ## vegan::dbrda
   wrda <- dbrda(wdist ~ 1)
   wrda_eig <- eigenvals(wrda)
   varPC1 <- round(wrda_eig[1]/sum(wrda_eig)*100,2)
@@ -248,8 +249,8 @@ for(dd in c("uu","wu","bray","jaccard")){
     mutate(grp1 = ifelse(is.na(BirthMode),"Mom-vagina", str_c(BirthMode, "pup", BodySite, sep = "-")),
            grp2 = ifelse(is.na(BirthMode),"Mom-vagina-day0", str_c("pup", TimePoint, sep = "-")))
   
-  x_lab <- paste0("MDS1 (", varPC1, "%)")
-  y_lab <- paste0("MDS2 (", varPC2, "%)")
+  x_lab <- paste0("PC1 (", varPC1, "%)")
+  y_lab <- paste0("PC2 (", varPC2, "%)")
   g <- plot_g1(wdat,  x_lab, y_lab)
   ggsave(filename = paste0(temp_out,dd,"_","vaginal_fecal_by_birthmode_MDS_vegan.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)
@@ -259,7 +260,7 @@ for(dd in c("uu","wu","bray","jaccard")){
   
   ## vegan::metaMDS
   set.seed(1)
-  wnmds <- metaMDS(wdist, k = 2)
+  wnmds <- metaMDS(wdist, k = 2, try = 50, trymax = 100)
   wnmds_fit <- envfit(wnmds ~ BodySite + Sex, data = wmeta)
   #ordiplot(wnmds, display = "site")
   #plot(wnmds_fit)
@@ -310,7 +311,7 @@ for(dd in c("uu","wu","bray","jaccard")){
     rownames_to_column(var = "Variable")
   write.csv(rbind(d1, d2, d3), 
             file = paste0(temp_out,dd,"_","dispersion_test.csv"), quote = F, row.names = F)
-  ##pairwise adonis TBD
+  ##pairwise adonis 
   comp <- combn(wmeta$TimePoint %>% unique() %>% as.character(),2)
   res <- lapply(1:ncol(comp), function(i){
     wwmeta <- wmeta %>% filter(TimePoint %in% comp[,i])
@@ -399,7 +400,7 @@ for(dd in c("uu","wu","bray","jaccard")){
 }
 ```
 
-## plot pups PCoA use vegan dbrda
+## plot pups PCoA use vegan mds, nmds
 ```{r}
 for(dd in c("uu","wu","bray","jaccard")){
   wdist <- get(paste0("DM_",dd))
@@ -419,8 +420,9 @@ for(dd in c("uu","wu","bray","jaccard")){
   
   #Pcoa timepoint
   plot_timepoint_pcoa <- function(wdat, x_lab, y_lab){
-    ggplot(wdat, aes(x = PC1, y = PC2)) + 
-      geom_point(aes(color = TimePoint, shape = BirthMode), size = 2) + 
+    ggplot(wdat, aes(x = PC1, y = PC2, color = TimePoint)) + 
+      geom_point(aes(shape = BirthMode), size = 2) + 
+      stat_ellipse(type = "t") + 
       scale_color_manual(values = TimePoint_color) + 
       labs(x = x_lab, y = y_lab, title = "") +
       theme_bw() + theme(aspect.ratio = 1,
@@ -435,7 +437,7 @@ for(dd in c("uu","wu","bray","jaccard")){
                            title = element_text(size=12,color="black",face='bold'))    
   }
   g <- plot_timepoint_pcoa(wdat_rda, x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_timepoint_pcoa_rda.pdf"), device = cairo_pdf, 
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_timepoint_pcoa.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)
   #PC1 by timepoint
   plot_timepoint_pc1 <- function(wdat, x_lab){
@@ -482,12 +484,11 @@ for(dd in c("uu","wu","bray","jaccard")){
            plot = g, width = 7, height = 5, units = "in", dpi = 300)  
   ##Poca birthmode
   plot_birthmode_pcoa <- function(wdat, x_lab, y_lab){
-    ggplot(wdat, aes(x = PC1, y = PC2)) + 
-      geom_point(aes(color = BirthMode), size = 2) + 
+    ggplot(wdat, aes(x = PC1, y = PC2, color = BirthMode)) + 
+      geom_point( size = 2) + 
+      stat_ellipse(type = "t") + 
       scale_color_manual(values = BirthMode_color) + 
-      labs(x = paste0("PC1 (", varPC1, "%)"), 
-           y = paste0("PC2 (", varPC2, "%)"), 
-           title = "") +
+      labs(x = x_lab, y = y_lab, title = "") +
       theme_bw() + theme(aspect.ratio = 1,
                            panel.background = element_rect(fill = NA),
                            strip.text = element_text(size=12,color="black",face='bold'),
@@ -501,7 +502,72 @@ for(dd in c("uu","wu","bray","jaccard")){
   }
   g <- plot_birthmode_pcoa(wdat_rda, x_lab, y_lab) 
   ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_pcoa.pdf"), device = cairo_pdf, 
-           plot = g, width = 14, height = 10, units = "in", dpi = 300)
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)
+  ##Poca birthmode by timepoint
+  plot_birthmode_pcoa_timepoint <- function(wdat, x_lab, y_lab){
+    ggplot(wdat, aes(x = PC1, y = PC2, color = BirthMode)) + 
+      geom_point( size = 2) + 
+      stat_ellipse(type = "t") + 
+      scale_color_manual(values = BirthMode_color) + 
+      labs(x = x_lab, y = y_lab, title = "") + 
+      facet_wrap(~TimePoint, nrow = 2) + 
+      theme_bw() + theme(aspect.ratio = 1,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+  }
+  g <- plot_birthmode_pcoa_timepoint(wdat_rda, x_lab, y_lab)   
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_timepoint_pcoa.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)
+  ##Poca sex
+  plot_sex_pcoa <- function(wdat, x_lab, y_lab){
+    ggplot(wdat, aes(x = PC1, y = PC2, color = Sex)) + 
+      geom_point(size = 2) + 
+      stat_ellipse(type = "t") + 
+      scale_color_manual(values = Sex_color, labels = Sex_labs) + 
+      labs(x = x_lab, y = y_lab, title = "") +
+      theme_bw() + theme(aspect.ratio = 1,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+  }
+  g <- plot_sex_pcoa(wdat_rda, x_lab, y_lab) 
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_sex_pcoa.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)
+  ##Poca sex by timepoint
+  plot_sex_pcoa_timepoint <- function(wdat, x_lab, y_lab){
+    ggplot(wdat, aes(x = PC1, y = PC2, color = Sex)) + 
+      geom_point( size = 2) + 
+      stat_ellipse(type = "t") + 
+      scale_color_manual(values = Sex_color, labels = Sex_labs) + 
+      labs(x = x_lab, y = y_lab, title = "") + 
+      facet_wrap(~TimePoint, nrow = 2) + 
+      theme_bw() + theme(aspect.ratio = 1,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+  }
+  g <- plot_sex_pcoa_timepoint(wdat_rda, x_lab, y_lab)   
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_sex_timepoint_pcoa.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)
   #explore birthmode effect on PCs
   wdat <- merge(wrda$CA$u[,1:9], wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
     select(BirthMode, Sex, TimePoint, MDS1:MDS9) %>% 
@@ -513,14 +579,13 @@ for(dd in c("uu","wu","bray","jaccard")){
     facet_wrap(~PC, nrow = 3)
   ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_timepoint_9D.pdf"), device = cairo_pdf, 
            plot = g, width = 14, height = 10, units = "in", dpi = 300)  
-
   g <- ggplot(wdat, aes(x = BirthMode, y = value, )) + 
     geom_boxplot(aes(fill=BirthMode)) + 
     stat_compare_means(aes(group=BirthMode), hide.ns = T, label = "p.format") + 
     labs(x="", y="", title = "") + 
     facet_wrap(~PC, nrow = 3)
   ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_9D.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
+           plot = g, width = 14, height = 10, units = "in", dpi = 300)
   ############ NMDS
   set.seed(1)
   wnmds <- metaMDS(wdist, k = 2, try = 50, trymax = 100)
@@ -530,21 +595,59 @@ for(dd in c("uu","wu","bray","jaccard")){
   x_lab <- "NMDS1"
   y_lab <- "NMDS2"
   g <- plot_timepoint_pcoa(wdat_nmds, x_lab, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_timepoint_pcoa_rda.pdf"), device = cairo_pdf, 
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_timepoint_nmds.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)  
   g <- plot_timepoint_pc1(wdat_nmds, x_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_timepoint_pc1.pdf"), device = cairo_pdf, 
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_timepoint_nmds1.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)
   g <- plot_timepoint_pc2(wdat_nmds, y_lab)
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_timepoint_pc2.pdf"), device = cairo_pdf, 
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_timepoint_nmds2.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)      
-    
   g <- plot_birthmode_pcoa(wdat_nmds, x_lab, y_lab) 
-  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_pcoa.pdf"), device = cairo_pdf, 
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_nmds.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)
+  g <- plot_birthmode_pcoa_timepoint(wdat_nmds, x_lab, y_lab)   
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_birthmode_timepoint_nmds.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)
+  g <- plot_sex_pcoa(wdat_nmds, x_lab, y_lab) 
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_sex_nmds.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)  
+  g <- plot_sex_pcoa_timepoint(wdat_nmds, x_lab, y_lab)   
+  ggsave(filename = paste0(temp_out,dd,"_","pup_by_sex_timepoint_nmds.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300) 
 }
 ```
 
+## overweight
+```{r}
+wmeta <- meta_all %>% left_join(at_week15 %>% select(MouseID, BW_status, Overweight, Underweight), 
+                        by = "MouseID") %>% filter(!is.na(BW_status))
+
+for(dd in c("uu","wu","bray","jaccard")){
+  wdist <- get(paste0("DM_",dd))
+  wmeta <- wmeta %>% filter(SampleID %in% labels(wdist)) 
+  wdist <- dist_subset(wdist, wmeta$SampleID)
+  ##
+  disper <- betadisper(wdist, wmeta$Overweight)
+  d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+    rownames_to_column(var = "Variable")
+  write.csv(d1, 
+            file = paste0(temp_out,dd,"_","Overweight_dispersion_test.csv"), quote = F, row.names = F)
+  ##
+  per <- adonis2(wdist ~ Overweight+BirthMode+TimePoint+Sex, data = wmeta, by = "margin")
+  res = calcOmega2_dm(per)
+  res$BirthMode <- "All"
+  res$TimePoint <- "All"
+  res$Sex <- "All"
+  res$fo <- "BirthMode + TimePoint + Sex"
+  res_all <-list.append(res_all, res)  
+  
+  
+
+
+
+
+```
 
 
 

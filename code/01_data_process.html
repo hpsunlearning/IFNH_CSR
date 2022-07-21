@@ -375,12 +375,7 @@ pre code {
 library(readxl)
 library(phyloseq)
 library(qiime2R)
-#library(picante)
 library(Hmisc)
-#library(usedist)
-#library(purrr)
-#library(furrr)
-#library(picante)
 library(vegan)
 library(tidyverse)</code></pre>
 </div>
@@ -393,7 +388,9 @@ metafile = &quot;MasterMetadata-CS-SW-20220623-hs.xlsx&quot;
 # set colors, labs and so on
 BirthMode_color = c(&quot;VF&quot;=&quot;#377EB8&quot;, &quot;CSR&quot;=&quot;#4DAF4A&quot;, &quot;CS&quot;=&quot;#E41A1C&quot;)
 Sex_labs = c(&quot;F&quot; = &quot;Female&quot;, &quot;M&quot; = &quot;Male&quot;)
+Sex_color = c(&quot;F&quot;=&quot;#e9a3c9&quot;, &quot;M&quot;=&quot;#a1d76a&quot;)
 responder_color = c(&quot;Responder&quot;=&quot;#d95f0e&quot;, &quot;Nonresponder&quot;=&quot;gray50&quot;)
+TimePoint_color = c(&quot;Week3&quot;=&quot;#c7e9b4&quot;, &quot;Week6&quot;=&quot;#7fcdbb&quot;, &quot;Week9-14&quot;=&quot;#41b6c4&quot;, &quot;Week18&quot;=&quot;#2c7fb8&quot;)
 BW_status_color = c(&quot;Overweight&quot;=&quot;#7570b3&quot;, &quot;Normal&quot;=&quot;#b3cde3&quot;,&quot;Underweight&quot;=&quot;#66a61e&quot;)</code></pre>
 </div>
 <div id="body-weight-data" class="section level2">
