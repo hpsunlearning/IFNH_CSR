@@ -631,21 +631,43 @@ for(dd in c("uu","wu","bray","jaccard")){
   disper <- betadisper(wdist, wmeta$Overweight)
   d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
     rownames_to_column(var = "Variable")
-  write.csv(d1, 
-            file = paste0(temp_out,dd,"_","Overweight_dispersion_test.csv"), quote = F, row.names = F)
+  write.csv(d1, file = paste0(temp_out,dd,"_","Overweight_dispersion_test.csv"), 
+            quote = F, row.names = F)
   ##
   per <- adonis2(wdist ~ Overweight+BirthMode+TimePoint+Sex, data = wmeta, by = "margin")
   res = calcOmega2_dm(per)
-  res$BirthMode <- "All"
-  res$TimePoint <- "All"
-  res$Sex <- "All"
-  res$fo <- "BirthMode + TimePoint + Sex"
-  res_all <-list.append(res_all, res)  
+  write.csv(res, file = paste0(temp_out,dd,"_","Overweight_adonis_test.csv"))
+  ## pcoa
+  wrda <- dbrda(wdist ~ 1)
+  wrda_eig <- eigenvals(wrda)
+  varPC1 <- round(wrda_eig[1]/sum(wrda_eig)*100,2)
+  varPC2 <- round(wrda_eig[2]/sum(wrda_eig)*100,2)
+  wrda_fit <- envfit(wrda ~ Overweight + BirthMode + Sex + TimePoint, data = wmeta)
+  wdat_rda <- merge(wrda$CA$u[,1:2], wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
+    rename(PC1 = MDS1, PC2 = MDS2)
+  x_lab <- paste0("PC1 (", varPC1, "%)")
+  y_lab <- paste0("PC2 (", varPC2, "%)")
   
-  
-
-
-
+  g <- ggplot(wdat_rda, aes(x = PC1, y = PC2, color = Overweight)) + 
+      geom_point( size = 2) + 
+      stat_ellipse(type = "t") + 
+      scale_color_manual(values = c("Y"="#d73027", "N"="#1a9850"), 
+                         name = "Overweight") + 
+      labs(x = x_lab, y = y_lab, title = "") + 
+      facet_wrap(~TimePoint, nrow = 2) + 
+      theme_bw() + theme(aspect.ratio = 1,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+  ggsave(filename = paste0(temp_out,dd,"_","pup_Overweight_by_timepoint_pcoa.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)
+}
 
 ```
 

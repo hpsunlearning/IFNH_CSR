@@ -1,0 +1,39 @@
+2022-07-21 21:27:58 INFO::Writing function arguments to log file
+2022-07-21 21:27:58 DEBUG::Function arguments
+2022-07-21 21:27:58 DEBUG::Output folder: ../result/taxa/maaslin2/All_timepoint_Order
+2022-07-21 21:27:58 DEBUG::Min Abundance: 0.000000
+2022-07-21 21:27:58 DEBUG::Min Prevalence: 0.100000
+2022-07-21 21:27:58 DEBUG::Normalization: TSS
+2022-07-21 21:27:58 DEBUG::Transform: LOG
+2022-07-21 21:27:58 DEBUG::Analysis method: LM
+2022-07-21 21:27:58 DEBUG::Max significance: 0.100000
+2022-07-21 21:27:58 DEBUG::Random effects: MouseID
+2022-07-21 21:27:58 DEBUG::Fixed effects: BirthMode,Sex,TimePoint
+2022-07-21 21:27:58 DEBUG::Correction method: BH
+2022-07-21 21:27:58 DEBUG::Standardize: TRUE
+2022-07-21 21:27:58 DEBUG::Cores: 4
+2022-07-21 21:27:58 INFO::Verifying options selected are valid
+2022-07-21 21:27:58 INFO::Determining format of input files
+2022-07-21 21:27:58 INFO::Input format is data samples as rows and metadata samples as rows
+2022-07-21 21:27:58 DEBUG::A total of 280 samples were found in both the data and metadata
+2022-07-21 21:27:58 DEBUG::Reordering data/metadata to use same sample ordering
+2022-07-21 21:27:58 INFO::Formula for random effects: expr ~ (1 | MouseID)
+2022-07-21 21:27:58 INFO::Formula for fixed effects: expr ~  BirthMode + Sex + TimePoint
+2022-07-21 21:27:59 INFO::Filter data based on min abundance and min prevalence
+2022-07-21 21:28:00 INFO::Total samples in data: 280
+2022-07-21 21:28:00 INFO::Min samples required with min abundance for a feature not to be filtered: 28.000000
+2022-07-21 21:28:00 INFO::Total filtered features: 34
+2022-07-21 21:28:00 INFO::Filtered feature names from abundance and prevalence filtering:
+2022-07-21 21:28:00 INFO::Total filtered features with variance filtering: 0
+2022-07-21 21:28:00 INFO::Filtered feature names from variance filtering:
+2022-07-21 21:28:00 INFO::Running selected normalization method: TSS
+2022-07-21 21:28:00 INFO::Applying z-score to standardize continuous metadata
+2022-07-21 21:28:00 INFO::Running selected transform method: LOG
+2022-07-21 21:28:00 INFO::Running selected analysis method: LM
+2022-07-21 21:28:00 INFO::Creating cluster of 4 R processes
+2022-07-21 21:28:05 INFO::Counting total values for each feature
+2022-07-21 21:28:05 INFO::Writing residuals to file ../result/taxa/maaslin2/All_timepoint_Order/residuals.rds
+2022-07-21 21:28:05 INFO::Writing fitted values to file ../result/taxa/maaslin2/All_timepoint_Order/fitted.rds
+2022-07-21 21:28:05 INFO::Writing extracted random effects to file ../result/taxa/maaslin2/All_timepoint_Order/ranef.rds
+2022-07-21 21:28:05 INFO::Writing all results to file (ordered by increasing q-values): ../result/taxa/maaslin2/All_timepoint_Order/all_results.tsv
+2022-07-21 21:28:05 INFO::Writing the significant results (those which are less than or equal to the threshold of 0.100000 ) to file (ordered by increasing q-values): ../result/taxa/maaslin2/All_timepoint_Order/significant_results.tsv
