@@ -27,7 +27,7 @@ BirthMode_color = c("VF"="#377EB8", "CSR"="#4DAF4A", "CS"="#E41A1C")
 Sex_labs = c("F" = "Female", "M" = "Male")
 Sex_color = c("F"="#e9a3c9", "M"="#a1d76a")
 responder_color = c("Responder"="#d95f0e", "Nonresponder"="gray50")
-TimePoint_color = c("Week3"="#c7e9b4", "Week6"="#7fcdbb", "Week9-14"="#41b6c4", "Week18"="#2c7fb8")
+TimePoint_color = c("Week3"="#fdbe85", "Week6"="#fd8d3c", "Week9-14"="#e6550d", "Week18"="#a63603")
 BW_status_color = c("Overweight"="#7570b3", "Normal"="#b3cde3","Underweight"="#66a61e")
 ```
 
@@ -112,17 +112,39 @@ meta_all = phylo_all@sam_data@.Data %>% as.data.frame()
 names(meta_all) = phylo_all@sam_data@names
 meta_all$SampleID = phylo_all@sam_data@row.names
 meta_all$Seq_count = sample_sums(phylo_all)
-meta_all %>% filter(Generation == "F1") %>% {table(.$BirthMode, .$TimePointInWeeks)}
+#meta_all %>% filter(Generation == "F1") %>% {table(.$BirthMode, .$TimePointInWeeks)}
 meta_all = meta_all %>% mutate(TimePoint = case_when(TimePointInWeeks == 3 ~ "Week3",
                                           TimePointInWeeks == 6 ~ "Week6",
                                           TimePointInWeeks == 18 ~ "Week18",
                                           TimePointInWeeks %in% c(9,11,12,14) ~ "Week9-14"))
 meta_all$TimePoint = factor(meta_all$TimePoint, levels = c("Week3","Week6","Week9-14","Week18"),ordered = T)
-meta_all %>% filter(Generation == "F1") %>% {table(.$BirthMode, .$TimePoint)}
+#meta_all %>% filter(Generation == "F1") %>% {table(.$BirthMode, .$TimePoint)}
 meta_all$Sample_or_Blank = ifelse(is.na(meta_all$MouseID),T,F)
 
 sam_new = sample_data(meta_all %>% column_to_rownames(var = "SampleID"))
 sample_data(phylo_all) = sam_new
+
+BW_sum %>% mutate(Count = paste0(N, "(", N_family, ")")) %>% 
+  select(BirthMode, Sex, TimePoint_Weeks, Count) %>% 
+  spread(key = TimePoint_Weeks, value = Count) 
+
+meta_all %>% filter(Generation == "F1") %>% 
+  group_by(BirthMode, TimePointInWeeks, Sex) %>% 
+  summarise(N = n(),
+            N_family = unique(FamilyNo) %>% length(),
+            Count = paste0(N, "(", N_family, ")")) %>%
+  ungroup() %>% 
+  dplyr::select(BirthMode, Sex, TimePointInWeeks, Count) %>% 
+  tidyr::spread(key = TimePointInWeeks, value = Count) 
+  
+meta_all %>% filter(Generation == "F1") %>% 
+  group_by(BirthMode, TimePoint, Sex) %>% 
+  summarise(N = n(),
+            N_family = unique(FamilyNo) %>% length(),
+            Count = paste0(N, "(", N_family, ")")) %>%
+  ungroup() %>% 
+  dplyr::select(BirthMode, Sex, TimePoint, Count) %>% 
+  tidyr::spread(key = TimePoint, value = Count) 
 ```
 
 ### taxa

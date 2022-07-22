@@ -54,7 +54,7 @@ g = ggplot(BW, aes(x = TimePoint_Weeks, color = BirthMode)) +
                      legend.title = element_text(size=12,color="black",face='bold'),
                      title = element_text(size=12,color="black",face='bold'))
 ggsave(filename = paste0(temp_out,"body_weight_overall.pdf"), device = cairo_pdf, 
-         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+         plot = g, width = 14, height = 5, units = "in", dpi = 300)
 ```
 
 ### plot BWgain
@@ -81,7 +81,7 @@ g = ggplot(BWgain, aes(x = TimePoint_Weeks, color = BirthMode)) +
                      legend.title = element_text(size=12,color="black",face='bold'),
                      title = element_text(size=12,color="black",face='bold'))
 ggsave(filename = paste0(temp_out,"body_weight_gain_overall.pdf"), device = cairo_pdf,
-       plot = g, width = 7, height = 5, units = "in", dpi = 300)
+       plot = g, width = 14, height = 5, units = "in", dpi = 300)
 
 p = ggplot(BWgain, aes(x = TimePoint_Weeks, color = BirthMode)) +
   geom_point(aes(y = BW_gain_percent), size = 0.5, alpha = 0.7) +
@@ -106,7 +106,7 @@ p = ggplot(BWgain, aes(x = TimePoint_Weeks, color = BirthMode)) +
                      legend.title = element_text(size=12,color="black",face='bold'),
                      title = element_text(size=12,color="black",face='bold'))
 ggsave(filename = paste0(temp_out,"body_weight_gain_percent_overall.pdf"), plot = p,
-    width = 7, height = 5, units = "in", dpi = 300)
+    width = 14, height = 5, units = "in", dpi = 300)
 ```
 
 ## LMM model
@@ -199,7 +199,7 @@ lmm_model_nlme <- function(x, dir, ...){
 dir = paste0(temp_out,"")
 model_input = list(Sex = c("M", "F"), y = c("Weight_g", "BW_gain", "BW_gain_percent")) %>% cross()
 map(model_input, lmm_model_lme4, dir = dir)
-map(model_input, lmm_model_nlme, dir = dir) # Error in eval(x$call$fixed) : object 'fo' not found 
+#map(model_input, lmm_model_nlme, dir = dir) # Error in eval(x$call$fixed) : object 'fo' not found 
 ```
 
 

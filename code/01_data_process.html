@@ -390,7 +390,7 @@ BirthMode_color = c(&quot;VF&quot;=&quot;#377EB8&quot;, &quot;CSR&quot;=&quot;#4
 Sex_labs = c(&quot;F&quot; = &quot;Female&quot;, &quot;M&quot; = &quot;Male&quot;)
 Sex_color = c(&quot;F&quot;=&quot;#e9a3c9&quot;, &quot;M&quot;=&quot;#a1d76a&quot;)
 responder_color = c(&quot;Responder&quot;=&quot;#d95f0e&quot;, &quot;Nonresponder&quot;=&quot;gray50&quot;)
-TimePoint_color = c(&quot;Week3&quot;=&quot;#c7e9b4&quot;, &quot;Week6&quot;=&quot;#7fcdbb&quot;, &quot;Week9-14&quot;=&quot;#41b6c4&quot;, &quot;Week18&quot;=&quot;#2c7fb8&quot;)
+TimePoint_color = c(&quot;Week3&quot;=&quot;#fdbe85&quot;, &quot;Week6&quot;=&quot;#fd8d3c&quot;, &quot;Week9-14&quot;=&quot;#e6550d&quot;, &quot;Week18&quot;=&quot;#a63603&quot;)
 BW_status_color = c(&quot;Overweight&quot;=&quot;#7570b3&quot;, &quot;Normal&quot;=&quot;#b3cde3&quot;,&quot;Underweight&quot;=&quot;#66a61e&quot;)</code></pre>
 </div>
 <div id="body-weight-data" class="section level2">
@@ -505,27 +505,70 @@ a</code></pre>
 names(meta_all) = phylo_all@sam_data@names
 meta_all$SampleID = phylo_all@sam_data@row.names
 meta_all$Seq_count = sample_sums(phylo_all)
-meta_all %&gt;% filter(Generation == &quot;F1&quot;) %&gt;% {table(.$BirthMode, .$TimePointInWeeks)}</code></pre>
-<pre><code>##      
-##        3  6  9 11 12 14 18
-##   CS  28 22  4  8  6  4 16
-##   CSR 26 22  4  9  4  4 11
-##   VF  37 30  6 11  8  4 19</code></pre>
-<pre class="r"><code>meta_all = meta_all %&gt;% mutate(TimePoint = case_when(TimePointInWeeks == 3 ~ &quot;Week3&quot;,
+#meta_all %&gt;% filter(Generation == &quot;F1&quot;) %&gt;% {table(.$BirthMode, .$TimePointInWeeks)}
+meta_all = meta_all %&gt;% mutate(TimePoint = case_when(TimePointInWeeks == 3 ~ &quot;Week3&quot;,
                                           TimePointInWeeks == 6 ~ &quot;Week6&quot;,
                                           TimePointInWeeks == 18 ~ &quot;Week18&quot;,
                                           TimePointInWeeks %in% c(9,11,12,14) ~ &quot;Week9-14&quot;))
 meta_all$TimePoint = factor(meta_all$TimePoint, levels = c(&quot;Week3&quot;,&quot;Week6&quot;,&quot;Week9-14&quot;,&quot;Week18&quot;),ordered = T)
-meta_all %&gt;% filter(Generation == &quot;F1&quot;) %&gt;% {table(.$BirthMode, .$TimePoint)}</code></pre>
-<pre><code>##      
-##       Week3 Week6 Week9-14 Week18
-##   CS     28    22       22     16
-##   CSR    26    22       21     11
-##   VF     37    30       29     19</code></pre>
-<pre class="r"><code>meta_all$Sample_or_Blank = ifelse(is.na(meta_all$MouseID),T,F)
+#meta_all %&gt;% filter(Generation == &quot;F1&quot;) %&gt;% {table(.$BirthMode, .$TimePoint)}
+meta_all$Sample_or_Blank = ifelse(is.na(meta_all$MouseID),T,F)
 
 sam_new = sample_data(meta_all %&gt;% column_to_rownames(var = &quot;SampleID&quot;))
-sample_data(phylo_all) = sam_new</code></pre>
+sample_data(phylo_all) = sam_new
+
+BW_sum %&gt;% mutate(Count = paste0(N, &quot;(&quot;, N_family, &quot;)&quot;)) %&gt;% 
+  select(BirthMode, Sex, TimePoint_Weeks, Count) %&gt;% 
+  spread(key = TimePoint_Weeks, value = Count) </code></pre>
+<pre><code>## # A tibble: 6 × 20
+##   BirthMode Sex   `1`   `2`    `3`    `4`   `5`    `6`   `7`   `8`   `9`   `10` 
+##   &lt;fct&gt;     &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;  &lt;chr&gt;  &lt;chr&gt; &lt;chr&gt;  &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;
+## 1 CS        F     16(6) 27(12) 36(16) 22(7) 30(11) 27(1… 23(1… 15(7) 19(9) 11(5)
+## 2 CS        M     16(6) 26(12) 34(16) 20(7) 28(11) 25(1… 21(1… 13(7) 17(9) 9(5) 
+## 3 CSR       F     19(7) 24(10) 34(14) 21(7) 29(11) 24(1… 22(1… 14(7) 18(9) 10(5)
+## 4 CSR       M     19(7) 25(11) 35(15) 21(7) 29(11) 25(1… 22(1… 14(7) 18(9) 10(5)
+## 5 VF        F     23(9) 43(19) 49(25) 27(9) 39(15) 34(1… 30(1… 18(9) 26(1… 14(7)
+## 6 VF        M     27(9) 45(18) 49(25) 26(9) 38(15) 35(1… 29(1… 17(9) 26(1… 14(7)
+## # … with 8 more variables: `11` &lt;chr&gt;, `12` &lt;chr&gt;, `13` &lt;chr&gt;, `14` &lt;chr&gt;,
+## #   `15` &lt;chr&gt;, `16` &lt;chr&gt;, `17` &lt;chr&gt;, `18` &lt;chr&gt;</code></pre>
+<pre class="r"><code>meta_all %&gt;% filter(Generation == &quot;F1&quot;) %&gt;% 
+  group_by(BirthMode, TimePointInWeeks, Sex) %&gt;% 
+  summarise(N = n(),
+            N_family = unique(FamilyNo) %&gt;% length(),
+            Count = paste0(N, &quot;(&quot;, N_family, &quot;)&quot;)) %&gt;%
+  ungroup() %&gt;% 
+  dplyr::select(BirthMode, Sex, TimePointInWeeks, Count) %&gt;% 
+  tidyr::spread(key = TimePointInWeeks, value = Count) </code></pre>
+<pre><code>## `summarise()` has grouped output by &#39;BirthMode&#39;, &#39;TimePointInWeeks&#39;. You can
+## override using the `.groups` argument.</code></pre>
+<pre><code>## # A tibble: 6 × 9
+##   BirthMode Sex   `3`    `6`    `9`   `11`  `12`  `14`  `18`  
+##   &lt;chr&gt;     &lt;chr&gt; &lt;chr&gt;  &lt;chr&gt;  &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; 
+## 1 CS        F     14(11) 11(11) 2(2)  4(4)  3(3)  2(2)  8(8)  
+## 2 CS        M     14(11) 11(11) 2(2)  4(4)  3(3)  2(2)  8(8)  
+## 3 CSR       F     13(11) 11(11) 2(2)  4(4)  2(2)  2(2)  5(5)  
+## 4 CSR       M     13(11) 11(11) 2(2)  5(5)  2(2)  2(2)  6(6)  
+## 5 VF        F     19(15) 15(15) 3(3)  5(5)  4(4)  2(2)  10(10)
+## 6 VF        M     18(14) 15(15) 3(3)  6(6)  4(4)  2(2)  9(9)</code></pre>
+<pre class="r"><code>meta_all %&gt;% filter(Generation == &quot;F1&quot;) %&gt;% 
+  group_by(BirthMode, TimePoint, Sex) %&gt;% 
+  summarise(N = n(),
+            N_family = unique(FamilyNo) %&gt;% length(),
+            Count = paste0(N, &quot;(&quot;, N_family, &quot;)&quot;)) %&gt;%
+  ungroup() %&gt;% 
+  dplyr::select(BirthMode, Sex, TimePoint, Count) %&gt;% 
+  tidyr::spread(key = TimePoint, value = Count) </code></pre>
+<pre><code>## `summarise()` has grouped output by &#39;BirthMode&#39;, &#39;TimePoint&#39;. You can override
+## using the `.groups` argument.</code></pre>
+<pre><code>## # A tibble: 6 × 6
+##   BirthMode Sex   Week3  Week6  `Week9-14` Week18
+##   &lt;chr&gt;     &lt;chr&gt; &lt;chr&gt;  &lt;chr&gt;  &lt;chr&gt;      &lt;chr&gt; 
+## 1 CS        F     14(11) 11(11) 11(11)     8(8)  
+## 2 CS        M     14(11) 11(11) 11(11)     8(8)  
+## 3 CSR       F     13(11) 11(11) 10(10)     5(5)  
+## 4 CSR       M     13(11) 11(11) 11(11)     6(6)  
+## 5 VF        F     19(15) 15(15) 14(14)     10(10)
+## 6 VF        M     18(14) 15(15) 15(15)     9(9)</code></pre>
 </div>
 <div id="taxa" class="section level3">
 <h3>taxa</h3>
