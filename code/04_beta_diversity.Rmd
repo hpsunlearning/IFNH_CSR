@@ -139,23 +139,23 @@ cal_unifrac_dist_rarefy_bootstrap <- function(psdata, depth, n, block_size = 100
 ```
 
 ### calculate distance (only run one time)
-```{r}
-#load(file = "../data/BW_and_phylo.RData")
-#temp_out = "../result/beta/"
-#psdata <- subset_samples(phylo_decomtan, !Sample_or_Blank)
+```{r eval=FALSE, include=TRUE}
+load(file = "../data/BW_and_phylo.RData")
+temp_out = "../result/beta/"
+psdata <- subset_samples(phylo_decontam_clean, !Sample_or_Blank)
 
-#plan(multisession)  
-#system.time(unif_two <- cal_unifrac_dist_rarefy_bootstrap(psdata = psdata, depth = depth,                                                           n = 1000, block_size = 100))
+plan(multisession)  
+system.time(unif_two <- cal_unifrac_dist_rarefy_bootstrap(psdata = psdata, depth = depth,n = 1000, block_size = 100))
 #    user    system   elapsed 
 #603.109    29.838 10067.601 
-#DM_uu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "uu"), Sample1, Sample2, value) %>% as.dist()
-#DM_wu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "wu"), Sample1, Sample2, value) %>% as.dist()
+DM_uu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "uu"), Sample1, Sample2, value) %>% as.dist()
+DM_wu <- pivot_to_numeric_matrix(unif_two %>% filter(Metric == "wu"), Sample1, Sample2, value) %>% as.dist()
 
-#ft = t(psdata@otu_table@.Data)
-#system.time(DM_bray <- avgdist(ft,dmethod = "bray", sample = depth, iterations = 1000))
+ft = t(psdata@otu_table@.Data)
+system.time(DM_bray <- avgdist(ft,dmethod = "bray", sample = depth, iterations = 1000))
 #   user  system elapsed 
 #554.705   8.692 641.780 
-#system.time(DM_jaccard <- avgdist(ft,dmethod = "jaccard", sample = depth, iterations = 1000))
+system.time(DM_jaccard <- avgdist(ft,dmethod = "jaccard", sample = depth, iterations = 1000))
 #   user  system elapsed 
 #547.209  10.310 604.054 
 

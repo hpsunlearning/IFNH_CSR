@@ -7,40 +7,40 @@ output: html_document
 
 ## library
 ```{r setup, message=FALSE, warning=FALSE}
-library(knitr)
 library(phyloseq)
 library(purrr)
 library(furrr)
 library(picante)
 library(vegan)
 library(MASS)
+library(ggpubr)
 library(tidyverse)
 ```
 
-## rarefy to the depth (only run one time)
-```{r eval=FALSE, include=TRUE}
+## rarefy to the depth 
+```{r}
 load(file = "../data/BW_and_phylo.RData")
+```
 
-ft = t((subset_samples(phylo_decomtan, !Sample_or_Blank))@otu_table@.Data)
-ft_list = ft %>% 
+### bootstrap method (only run one time)
+```{r eval=FALSE, include=TRUE}
+ft <- t((subset_samples(phylo_decontam_clean, !Sample_or_Blank))@otu_table@.Data)
+ft_list <- ft %>% 
   as.data.frame() %>% rownames_to_column(var = "SampleID") %>%
   pivot_longer(-SampleID, names_to = "ASV", values_to = "count") %>%
   filter(count > 0) %>% split(., .$SampleID)
 
-asv_count_df = ft_list[[2]]
-phylotree = phylo_decomtan@phy_tree
-
-alpha_diversity_bootstrap = function(asv_count_df, phylotree, depth, n=100){
-  alpha_diversity_sample = function(asv_count_df, phylotree, seed, depth){
-      all_asv_count = rep(asv_count_df$ASV, asv_count_df$count)
+alpha_diversity_bootstrap <- function(asv_count_df, phylotree, depth, n=100){
+  alpha_diversity_sample <- function(asv_count_df, phylotree, seed, depth){
+      all_asv_count <- rep(asv_count_df$ASV, asv_count_df$count)
       set.seed(seed)
-      boot_asv = sample(all_asv_count, size = depth, replace = T)
-      boot_dat = table(boot_asv) %>% as.matrix() 
-      colnames(boot_dat) = "count"
-      faith = pd(t(boot_dat), phylotree, include.root = F)$PD
-      observed = nrow(boot_dat)
-      shannon = diversity(boot_dat, index = "shannon")
-      evenness = shannon/log(observed)
+      boot_asv <- sample(all_asv_count, size = depth, replace = T)
+      boot_dat <- table(boot_asv) %>% as.matrix() 
+      colnames(boot_dat) <- "count"
+      faith <- pd(t(boot_dat), phylotree, include.root = F)$PD
+      observed <- nrow(boot_dat)
+      shannon <- diversity(boot_dat, index = "shannon")
+      evenness <- shannon/log(observed)
       data.frame(faith = faith, observed = observed, shannon = shannon, evenness = evenness)
   }
   if (sum(asv_count_df$count) < depth){
@@ -53,23 +53,36 @@ alpha_diversity_bootstrap = function(asv_count_df, phylotree, depth, n=100){
     }
 }
 
+phylotree <- phylo_decontam_clean@phy_tree
+
 plan(multisession)
 system.time(aa <- future_map_dfr(ft_list, alpha_diversity_bootstrap, 
                                 phylotree = phylotree, depth = depth, n = 1000, 
                                 .id = "SampleID", .progress = F,
                                 .options = furrr_options(seed=NULL)))
-alpha_boot = aa %>% filter(!is.na(faith)) %>%
+#   user  system elapsed 
+#   1.97    0.32  646.89
+alpha_boot <- aa %>% filter(!is.na(faith)) %>%
   select(SampleID, Faith_PD=faith, Observed_ASVs=observed, Shannon_Index=shannon, Pielou_evenness=evenness)
+save(alpha_boot, file = "../data/temp_alpha.RData")
+```
 
-#alpha from a rarefied table
-a1 = pd(t(phylo_decomtan_rf@otu_table@.Data), phylo_decomtan_rf@phy_tree, include.root = F)
-a2 = estimate_richness(phylo_decomtan_rf, measures="Shannon")
-alpha_rftb = merge(a1, a2, by=0)
-names(alpha_rftb) = c("SampleID","Faith_PD", "Observed_ASVs","Shannon_Index")
-alpha_rftb$Pielou_evenness = alpha_rftb$Shannon_Index/log(alpha_rftb$Observed_ASVs)
+### from rarefied feature table
+```{r}
+a1 <- pd(t(phylo_decontam_clean_rf@otu_table@.Data), phylo_decontam_clean_rf@phy_tree, include.root = F)
+a2 <- estimate_richness(phylo_decontam_clean_rf, measures="Shannon")
+alpha_rftb <- merge(a1, a2, by=0)
+names(alpha_rftb) <- c("SampleID","Faith_PD", "Observed_ASVs","Shannon_Index")
+alpha_rftb$Pielou_evenness <- alpha_rftb$Shannon_Index/log(alpha_rftb$Observed_ASVs)
 
 #rarefy table or bootstrap have similar results
-alpha_test = inner_join(alpha_rftb, alpha_boot, by = "SampleID")
+
+```
+
+### compare difference
+```{r}
+load(file = "../data/temp_alpha.RData")
+alpha_test <- inner_join(alpha_rftb, alpha_boot, by = "SampleID")
 alpha_test %>% mutate(faith_diff = Faith_PD.x - Faith_PD.y,
                       observed_diff = Observed_ASVs.x - Observed_ASVs.y,
                       shannon_diff = Shannon_Index.x - Shannon_Index.y,
@@ -88,10 +101,9 @@ alpha_test %>% pivot_longer(-SampleID, names_to = c("Metrics", "Method"), names_
     geom_point() + 
     geom_smooth(method = "lm") + 
     facet_wrap(~ Metrics, nrow = 2, scales = "free")
-
+#rarefy table or bootstrap have similar results
 #use bootstrapped alpha for further study
-alpha = alpha_boot
-#save(alpha, file = "../data/alpha.RData")
+save(alpha_boot, alpha_rftb, file = "../data/alpha.RData")
 ```
 
 ## load data
@@ -100,23 +112,33 @@ load(file = "../data/BW_and_phylo.RData")
 load(file = "../data/alpha.RData")
 load(file = "../data/BW_responder.RData")
 temp_out = "../result/alpha/"
-dat_alpha <- left_join(alpha, meta_all, by = "SampleID")
+dat_alpha <- left_join(alpha_boot, meta_all, by = "SampleID")
 ```
 
 ## alpha expolore mom vaginal
 ```{r}
-g <- dat_alpha %>% mutate(grp = case_when(TimePoint == "Week3" ~ "week3",
-                                      TimePoint == "Week6" ~ "week6",
-                                      TimePoint == "Week9-14" ~ "week9-14",
-                                      TimePoint == "Week18" ~ "week18",
-                                      BodySite == "Vaginal" ~ "at birth")) %>%
-  mutate(grp = factor(grp, levels = c("at birth","week3","week6","week9-14","week18"),
-                       ordered = TRUE)) %>% 
-  select(SampleID,grp,BodySite,Faith_PD,Observed_ASVs,Shannon_Index,Pielou_evenness) %>% 
+wdat <- dat_alpha %>% mutate(grp = case_when(Age_group == "Week3" ~ "Week3",
+                                      Age_group == "Week6" ~ "Week6",
+                                      Age_group == "Week9-14" ~ "Week9-14",
+                                      Age_group == "Week18" ~ "Week18",
+                                      BodySite == "Vaginal" ~ "At birth")) %>%
+  mutate(grp = factor(grp, levels = c("At birth","Week3","Week6","Week9-14","Week18"),
+                       ordered = TRUE)) 
+
+my_comparisons <- wdat$grp %>% unique() %>% as.character() %>% combn(., 2) %>% apply(.,2, list)
+comp_comb <- wdat$grp %>% unique() %>% as.character() %>% combn(., 2)
+
+my_comparisons <- list(comp_comb[,1], comp_comb[,2],comp_comb[,3], 
+                       comp_comb[,4],comp_comb[,5],comp_comb[,6],
+                       comp_comb[,7],comp_comb[,8],comp_comb[,9],comp_comb[,10])
+
+
+wdat %>% select(SampleID,grp,BodySite,Faith_PD:Pielou_evenness) %>% 
   pivot_longer(c(Faith_PD:Pielou_evenness), names_to = "Metrics") %>%
   ggplot(aes(x=grp, y=value)) + 
   geom_boxplot(aes(color=BodySite, fill=BodySite), alpha = 0.3, outlier.alpha = 0) + 
   geom_point(aes(color=BodySite), position = position_dodge2(width = 0.2)) + 
+  stat_compare_means(comparisons = my_comparisons, label = "p.signif") +
   scale_color_manual(values = c("Feces"="#7fc97f","Vaginal"="#beaed4"), 
                      name = "",
                      labels = c("pups fecal", "moms vaginal"),
@@ -133,7 +155,7 @@ g <- dat_alpha %>% mutate(grp = case_when(TimePoint == "Week3" ~ "week3",
                      legend.text = element_text(size=12,color="black",face='bold'),
                      legend.title = element_text(size=12,color="black",face='bold'),
                      title = element_text(size=12,color="black",face='bold'))
-ggsave(filename = paste0(temp_out,"vaginal_fecal_by_timepoint.pdf"), device = cairo_pdf, 
+ggsave(filename = paste0(temp_out,"vaginal_fecal_by_Age_group.pdf"), device = cairo_pdf, 
          plot = g, width = 7, height = 5, units = "in", dpi = 300)
 ```
 
@@ -167,15 +189,15 @@ write.csv(rbind(all_res[[1]]$coef,all_res[[2]]$coef,all_res[[3]]$coef,all_res[[4
           file = paste0(temp_out,"lm_coef_TimePointInWeeks_res.csv"), row.names = FALSE)
 write.csv(rbind(all_res[[1]]$anova,all_res[[2]]$anova,all_res[[3]]$anova,all_res[[4]]$anova),
           file = paste0(temp_out,"lm_anova_TimePointInWeeks_res.csv"), row.names = FALSE)
-###TimePoint
+###Age_group
 all_res <-lapply(metric, function(y){
   linear_model(data = dat_alpha_pup, y = y,
-                  x = "BirthMode + Sex + TimePoint")
+                  x = "BirthMode + Sex + Age_group")
 })
 write.csv(rbind(all_res[[1]]$coef,all_res[[2]]$coef,all_res[[3]]$coef,all_res[[4]]$coef),
-          file = paste0(temp_out,"lm_coef_TimePoint_res.csv"), row.names = FALSE)
+          file = paste0(temp_out,"lm_coef_Age_group_res.csv"), row.names = FALSE)
 write.csv(rbind(all_res[[1]]$anova,all_res[[2]]$anova,all_res[[3]]$anova,all_res[[4]]$anova),
-          file = paste0(temp_out,"lm_anova_TimePoint_res.csv"), row.names = FALSE)
+          file = paste0(temp_out,"lm_anova_Age_group_res.csv"), row.names = FALSE)
 ```
 
 ### compare birthmode
@@ -223,16 +245,16 @@ write.csv(all_res$grp, row.names = FALSE,
 write.csv(all_res$comp, row.names = FALSE,
           file = paste0(temp_out,"kw_aov_comp_birthmode_by_Sex_TimePointInWeeks.csv"))
 
-###TimePoint
+###Age_group
 lst_df <- expand.grid(dat_alpha_pup$Sex %>% unique(), 
-                       dat_alpha_pup$TimePoint %>% unique(), 
+                       dat_alpha_pup$Age_group %>% unique(), 
                        metric, stringsAsFactors = F)
-names(lst_df) <- c("Sex", "TimePoint", "Metrics")
+names(lst_df) <- c("Sex", "Age_group", "Metrics")
 
 plan(multisession)
 all_res <- future_map_dfr(1:nrow(lst_df), function(n){
   wdat <- dat_alpha_pup %>% filter(Sex == lst_df[n,"Sex"], 
-                                  TimePoint == lst_df[n,"TimePoint"])
+                                  Age_group == lst_df[n,"Age_group"])
   res <- comp_kw_aov(wdat = wdat, x = "BirthMode", y = lst_df[n,"Metrics"])
   res$grp <- cbind(res$grp, lst_df[n,],row.names = NULL)
   res$comp <- cbind(res$comp, lst_df[n,],row.names = NULL)
@@ -241,9 +263,9 @@ all_res <- future_map_dfr(1:nrow(lst_df), function(n){
 all_res$comp$KW_padj <- p.adjust(all_res$comp$KW_pvalue, method = "fdr")
 all_res$comp$aov_padj <- p.adjust(all_res$comp$aov_pvalue, method = "fdr")
 write.csv(all_res$grp, row.names = FALSE,
-          file = paste0(temp_out,"kw_aov_grp_birthmode_by_Sex_TimePoint.csv"))
+          file = paste0(temp_out,"kw_aov_grp_birthmode_by_Sex_Age_group.csv"))
 write.csv(all_res$comp, row.names = FALSE,
-          file = paste0(temp_out,"kw_aov_comp_birthmode_by_Sex_TimePoint.csv"))
+          file = paste0(temp_out,"kw_aov_comp_birthmode_by_Sex_Age_group.csv"))
 ```
 
 ### plot alpha by birthmod over time
@@ -251,13 +273,13 @@ write.csv(all_res$comp, row.names = FALSE,
 library(ggpubr)
 dat <- dat_alpha %>% filter(Generation=="F1") %>% 
   select(SampleID,Faith_PD,Observed_ASVs,Shannon_Index,Pielou_evenness, 
-         BodySite,TimePointInWeeks,TimePoint,Sex, BirthMode) %>% 
+         BodySite,TimePointInWeeks,Age_group,Sex, BirthMode) %>% 
   pivot_longer(c(Faith_PD:Pielou_evenness), names_to = "Metrics")
   
 metric <- dat$Metrics %>% unique()
 #by birthmod
 g <- ggplot(data = dat,
-           aes(x = TimePoint, y = value)) + 
+           aes(x = Age_group, y = value)) + 
   geom_boxplot(aes(color = BirthMode, fill = BirthMode),
                alpha = 0.3, outlier.alpha = 0) + 
   geom_point(aes(color = BirthMode), alpha = 0.7, size = 1,
@@ -277,11 +299,11 @@ g <- ggplot(data = dat,
                      legend.text = element_text(size=10,color="black",face='bold'),
                      legend.title = element_text(size=10,color="black",face='bold'),
                      title = element_text(size=10,color="black",face='bold'))
-ggsave(filename = paste0(temp_out,"pup_by_birthmode_by_timepoint.pdf"), device = cairo_pdf, 
+ggsave(filename = paste0(temp_out,"pup_by_birthmode_by_Age_group.pdf"), device = cairo_pdf, 
          plot = g, width = 7, height = 6, units = "in", dpi = 300)
 #by Sex
 g <- ggplot(data = dat,
-           aes(x = TimePoint, y = value)) + 
+           aes(x = Age_group, y = value)) + 
   geom_boxplot(aes(color = Sex, fill = Sex),
                alpha = 0.3, outlier.alpha = 0) + 
   geom_point(aes(color = Sex), alpha = 0.7,size = 1,
@@ -302,7 +324,7 @@ g <- ggplot(data = dat,
                      legend.text = element_text(size=10,color="black",face='bold'),
                      legend.title = element_text(size=10,color="black",face='bold'),
                      title = element_text(size=10,color="black",face='bold'))
-ggsave(filename = paste0(temp_out,"pup_by_sex_by_timepoint.pdf"), device = cairo_pdf, 
+ggsave(filename = paste0(temp_out,"pup_by_sex_by_Age_group.pdf"), device = cairo_pdf, 
          plot = g, width = 7, height = 6, units = "in", dpi = 300)
 ```
 
@@ -314,20 +336,20 @@ metric <- names(alpha)[2:5]
 
 all_res <-lapply(metric, function(y){
   linear_model(data = dat, y = y,
-                  x = "Overweight + Sex + BirthMode + TimePoint")
+                  x = "Overweight + Sex + BirthMode + Age_group")
 })
 write.csv(rbind(all_res[[1]]$coef,all_res[[2]]$coef,all_res[[3]]$coef,all_res[[4]]$coef),
           file = paste0(temp_out,"lm_coef_overweight_res.csv"), row.names = FALSE)
 write.csv(rbind(all_res[[1]]$anova,all_res[[2]]$anova,all_res[[3]]$anova,all_res[[4]]$anova),
           file = paste0(temp_out,"lm_anova_overweight_res.csv"), row.names = FALSE)
 
-lst_df <- expand.grid(dat$TimePoint %>% unique(), 
+lst_df <- expand.grid(dat$Age_group %>% unique(), 
                       metric, stringsAsFactors = F)
-names(lst_df) <- c("TimePoint","Metrics")
+names(lst_df) <- c("Age_group","Metrics")
 
 plan(multisession)
 all_res <- future_map_dfr(1:nrow(lst_df), function(n){
-  wdat <- dat %>% filter(TimePoint == lst_df[n,"TimePoint"])
+  wdat <- dat %>% filter(Age_group == lst_df[n,"Age_group"])
   res <- comp_kw_aov(wdat = wdat, x = "Overweight", y = lst_df[n,"Metrics"])
   res$grp <- cbind(res$grp, lst_df[n,],row.names = NULL)
   res$comp <- cbind(res$comp, lst_df[n,],row.names = NULL)
@@ -342,9 +364,9 @@ write.csv(all_res$comp, row.names = FALSE,
 
 dat_long <- dat %>%
   select(SampleID,Faith_PD,Observed_ASVs,Shannon_Index,Pielou_evenness, 
-         TimePoint, Sex, BirthMode, Overweight) %>% 
+         Age_group, Sex, BirthMode, Overweight) %>% 
   pivot_longer(c(Faith_PD:Pielou_evenness), names_to = "Metrics")
-g <- ggplot(dat_long, aes(x = TimePoint, y = value)) + 
+g <- ggplot(dat_long, aes(x = Age_group, y = value)) + 
   geom_boxplot(aes(color = Overweight, fill = Overweight),
                alpha = 0.3, outlier.alpha = 0) + 
   geom_point(aes(color = Overweight), alpha = 0.7, size = 1,
@@ -364,7 +386,7 @@ g <- ggplot(dat_long, aes(x = TimePoint, y = value)) +
                      legend.text = element_text(size=10,color="black",face='bold'),
                      legend.title = element_text(size=10,color="black",face='bold'),
                      title = element_text(size=10,color="black",face='bold'))
-ggsave(filename = paste0(temp_out,"pup_Overweight_by_timepoint.pdf"), device = cairo_pdf, 
+ggsave(filename = paste0(temp_out,"pup_Overweight_by_Age_group.pdf"), device = cairo_pdf, 
          plot = g, width = 7, height = 6, units = "in", dpi = 300)
 
 ```
