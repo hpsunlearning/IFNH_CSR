@@ -31,36 +31,69 @@ temp_out = "../result/sourcetrack/"
 ```{r}
 library(FEAST)
 wd <- getwd()
-Family_id_all <- meta_all %>% filter(Generation == "F0") %>% pull(FamilyNo)
-wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all)
+otu <- otu_table(phylo_decontam_clean)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
 Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
+
 dat <- wmeta %>% filter(FamilyNo %in% Family_id) %>%
   mutate(Env = ifelse(Generation == "F0", "Mom_Vaginal", "Pup_fecal"),
          SourceSink = ifelse(Generation == "F0", "Source", "Sink"),
          id = FamilyNo) %>% 
-  select(SampleID, Env, SourceSink, id) %>% 
+  dplyr::select(SampleID, Env, SourceSink, id) %>% 
   arrange(id, desc(Env))
-otu <- otu_table(phylo_decomtan) %>% as.matrix() %>% as.data.frame() %>% rownames_to_column(var = "id")
 
 for (fid in Family_id){
   wdat <- dat %>% filter(id == fid)
   wdat$id <- c(1:nrow(wdat)) 
   wdat <- wdat %>% mutate(id = ifelse(SourceSink == "Source", NA, id)) %>%
       column_to_rownames(var = "SampleID")
-  ft <- otu %>% select(id, row.names(wdat)) %>% column_to_rownames(var = "id") %>% t()
+  ft <- otu %>% dplyr::select(id, row.names(wdat)) %>% column_to_rownames(var = "id") %>% t()
   ft <- ft[,colSums(ft)>0]
   FEAST_output <- FEAST(C = ft, metadata = wdat, different_sources_flag = 0, 
                        dir_path = temp_out, 
-                       outfile=fid)
+                       outfile=paste0(fid,"_no_rf"))
+  setwd(wd)
+}
+
+otu <- otu_table(phylo_decontam_clean_rf)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
+Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
+
+dat <- wmeta %>% filter(FamilyNo %in% Family_id) %>%
+  mutate(Env = ifelse(Generation == "F0", "Mom_Vaginal", "Pup_fecal"),
+         SourceSink = ifelse(Generation == "F0", "Source", "Sink"),
+         id = FamilyNo) %>% 
+  dplyr::select(SampleID, Env, SourceSink, id) %>% 
+  arrange(id, desc(Env))
+
+for (fid in Family_id){
+  wdat <- dat %>% filter(id == fid)
+  wdat$id <- c(1:nrow(wdat)) 
+  wdat <- wdat %>% mutate(id = ifelse(SourceSink == "Source", NA, id)) %>%
+      column_to_rownames(var = "SampleID")
+  ft <- otu %>% dplyr::select(id, row.names(wdat)) %>% column_to_rownames(var = "id") %>% t()
+  ft <- ft[,colSums(ft)>0]
+  FEAST_output <- FEAST(C = ft, metadata = wdat, different_sources_flag = 0, 
+                       dir_path = temp_out, 
+                       outfile=paste0(fid,"_rf"))
   setwd(wd)
 }
 ```
 
 ### load FEAST result
 ```{r}
+otu <- otu_table(phylo_decontam_clean)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
+Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
 
 res <- lapply(Family_id, function(fid){
-  res <- read.table(file = paste0(temp_out,fid,"_source_contributions_matrix.txt"))
+  res <- read.table(file = paste0(temp_out,fid,"_no_rf_source_contributions_matrix.txt"))
   res <- res %>% rownames_to_column(var = "SampleID") %>% 
     mutate(SampleID = str_remove(SampleID, "_Pup_fecal"))
   names(res) <- c("SampleID", "Mom_vaginal", "Unknown")
@@ -68,7 +101,7 @@ res <- lapply(Family_id, function(fid){
 })
 dat <- do.call(rbind, res) %>% left_join(meta_all, by = "SampleID")
 
-g = ggplot(dat, aes(x = TimePoint, y = Mom_vaginal)) + 
+g = ggplot(dat, aes(x = Age_group, y = Mom_vaginal)) + 
   geom_point(aes(color = FamilyID)) + 
   geom_line(aes(color = FamilyID,group = MouseID)) + 
   scale_y_continuous(breaks = c(0,0.2,0.4,0.6,0.8),labels = scales::percent) + 
@@ -84,22 +117,56 @@ g = ggplot(dat, aes(x = TimePoint, y = Mom_vaginal)) +
                            legend.text = element_text(size=12,color="black",face='bold'),
                            legend.title = element_text(size=12,color="black",face='bold'),
                            title = element_text(size=12,color="black",face='bold'))
-ggsave(filename = paste0(temp_out,"FEAST_by_family_vaginal_source.pdf"), device = cairo_pdf, 
+ggsave(filename = paste0(temp_out,"FEAST_by_family_vaginal_source_no_rf.pdf"), device = cairo_pdf, 
+           plot = g, width = 9, height = 5, units = "in", dpi = 300)
+
+otu <- otu_table(phylo_decontam_clean_rf)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
+Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
+
+res <- lapply(Family_id, function(fid){
+  res <- read.table(file = paste0(temp_out,fid,"_rf_source_contributions_matrix.txt"))
+  res <- res %>% rownames_to_column(var = "SampleID") %>% 
+    mutate(SampleID = str_remove(SampleID, "_Pup_fecal"))
+  names(res) <- c("SampleID", "Mom_vaginal", "Unknown")
+  res
+})
+dat <- do.call(rbind, res) %>% left_join(meta_all, by = "SampleID")
+
+g = ggplot(dat, aes(x = Age_group, y = Mom_vaginal)) + 
+  geom_point(aes(color = FamilyID)) + 
+  geom_line(aes(color = FamilyID,group = MouseID)) + 
+  scale_y_continuous(breaks = c(0,0.2,0.4,0.6,0.8),labels = scales::percent) + 
+  labs(x = "",y = "Mom Vaginal Source Proportion (%)", title = "") + 
+  facet_grid(.~Sex, labeller = labeller(Sex = Sex_labs)) + 
+      theme_bw() + theme(aspect.ratio = 0.8,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = paste0(temp_out,"FEAST_by_family_vaginal_source_rf.pdf"), device = cairo_pdf, 
            plot = g, width = 9, height = 5, units = "in", dpi = 300)
 ```
 
 ## Share ASV
 ```{r}
-Family_id_all <- meta_all %>% filter(Generation == "F0") %>% pull(FamilyNo)
-wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all)
+otu <- otu_table(phylo_decontam_clean)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
 Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
 dat <- wmeta %>% filter(FamilyNo %in% Family_id) %>% arrange(FamilyNo, Generation)
-otu <- otu_table(phylo_decomtan) %>% as.matrix() %>% as.data.frame() %>% rownames_to_column(var = "id")
-
 
 res <- lapply(Family_id, function(fid){
   wdat <- dat %>% filter(FamilyNo == fid)
-  ft <- otu %>% select(id, wdat$SampleID) %>% column_to_rownames(var = "id") %>% t()
+  ft <- otu %>% dplyr::select(id, wdat$SampleID) %>% column_to_rownames(var = "id") %>% t()
   ft <- ft[,colSums(ft)>0]
   Mom_id <- wdat %>% filter(Generation == "F0") %>% pull(SampleID)
   ft_mom <- ft[pmatch(Mom_id,row.names(ft)),]
@@ -122,7 +189,7 @@ res <- lapply(Family_id, function(fid){
 
 dat <- do.call(rbind, res) %>% left_join(meta_all, by = "SampleID")
     
-g = ggplot(dat, aes(x = TimePoint, y = shared_pup_prop)) + 
+g = ggplot(dat, aes(x = Age_group, y = shared_pup_prop)) + 
   geom_point(aes(color = FamilyID)) + 
   geom_line(aes(color = FamilyID,group = MouseID)) + 
   scale_y_continuous(breaks = c(0,0.2,0.4,0.6,0.8),labels = scales::percent) + 
@@ -138,10 +205,10 @@ g = ggplot(dat, aes(x = TimePoint, y = shared_pup_prop)) +
                            legend.text = element_text(size=12,color="black",face='bold'),
                            legend.title = element_text(size=12,color="black",face='bold'),
                            title = element_text(size=12,color="black",face='bold'))
-ggsave(filename = paste0(temp_out,"ASV_share_prop_by_family_vaginal_source.pdf"), device = cairo_pdf, 
+ggsave(filename = paste0(temp_out,"ASV_share_prop_by_family_vaginal_source_no_rf.pdf"), device = cairo_pdf, 
            plot = g, width = 9, height = 5, units = "in", dpi = 300)
 
-g = ggplot(dat, aes(x = TimePoint, y = shared_pup_ra)) +     
+g = ggplot(dat, aes(x = Age_group, y = shared_pup_ra)) +     
   geom_point(aes(color = FamilyID)) + 
   geom_line(aes(color = FamilyID,group = MouseID)) + 
   scale_y_continuous(breaks = c(0,0.2,0.4,0.6,0.8),labels = scales::percent) + 
@@ -157,22 +224,91 @@ g = ggplot(dat, aes(x = TimePoint, y = shared_pup_ra)) +
                            legend.text = element_text(size=12,color="black",face='bold'),
                            legend.title = element_text(size=12,color="black",face='bold'),
                            title = element_text(size=12,color="black",face='bold'))
-ggsave(filename = paste0(temp_out,"ASV_share_ra_by_family_vaginal_source.pdf"), device = cairo_pdf, 
+ggsave(filename = paste0(temp_out,"ASV_share_ra_by_family_vaginal_source_no_rf.pdf"), device = cairo_pdf, 
            plot = g, width = 9, height = 5, units = "in", dpi = 300)
 
+otu <- otu_table(phylo_decontam_clean_rf)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
+Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
+dat <- wmeta %>% filter(FamilyNo %in% Family_id) %>% arrange(FamilyNo, Generation)
+
+res <- lapply(Family_id, function(fid){
+  wdat <- dat %>% filter(FamilyNo == fid)
+  ft <- otu %>% dplyr::select(id, wdat$SampleID) %>% column_to_rownames(var = "id") %>% t()
+  ft <- ft[,colSums(ft)>0]
+  Mom_id <- wdat %>% filter(Generation == "F0") %>% pull(SampleID)
+  ft_mom <- ft[pmatch(Mom_id,row.names(ft)),]
+  Pup_id <- wdat %>% filter(Generation == "F1") %>% pull(SampleID)
+  res <- lapply(Pup_id, function(pup){
+    ft_pup <- ft[pmatch(pup,row.names(ft)),]
+    mom_asv <- which(ft_mom>0) %>% names()
+    pup_asv <- which(ft_pup>0) %>% names()
+    shared_asv <- intersect(mom_asv, pup_asv)
+    res <- data.frame(SampleID = pup,
+                      Family_id = fid,
+                      Mom_n_asv = length(mom_asv),
+                      Pup_n_asv = length(pup_asv),
+                      shared_n_asv = length(shared_asv),
+                      shared_pup_prop = length(shared_asv) / length(pup_asv),
+                      shared_pup_ra = sum(ft_pup[shared_asv]) / sum(ft_pup))
+  })
+  res <- do.call(rbind, res)  
+})
+
+dat <- do.call(rbind, res) %>% left_join(meta_all, by = "SampleID")
+    
+g = ggplot(dat, aes(x = Age_group, y = shared_pup_prop)) + 
+  geom_point(aes(color = FamilyID)) + 
+  geom_line(aes(color = FamilyID,group = MouseID)) + 
+  scale_y_continuous(breaks = c(0,0.2,0.4,0.6,0.8),labels = scales::percent) + 
+  labs(x = "",y = "Mom ASV Proportion (%)", title = "") + 
+  facet_grid(.~Sex, labeller = labeller(Sex = Sex_labs)) + 
+      theme_bw() + theme(aspect.ratio = 0.8,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = paste0(temp_out,"ASV_share_prop_by_family_vaginal_source_rf.pdf"), device = cairo_pdf, 
+           plot = g, width = 9, height = 5, units = "in", dpi = 300)
+
+g = ggplot(dat, aes(x = Age_group, y = shared_pup_ra)) +     
+  geom_point(aes(color = FamilyID)) + 
+  geom_line(aes(color = FamilyID,group = MouseID)) + 
+  scale_y_continuous(breaks = c(0,0.2,0.4,0.6,0.8),labels = scales::percent) + 
+  labs(x = "",y = "Mom ASV Relative abundance (%)", title = "") + 
+  facet_grid(.~Sex, labeller = labeller(Sex = Sex_labs)) + 
+      theme_bw() + theme(aspect.ratio = 0.8,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = paste0(temp_out,"ASV_share_ra_by_family_vaginal_source_rf.pdf"), device = cairo_pdf, 
+           plot = g, width = 9, height = 5, units = "in", dpi = 300)
 ```
 
 ## heat map based on shared ASV
 ```{r}
-Family_id_all <- meta_all %>% filter(Generation == "F0") %>% pull(FamilyNo)
-wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all)
+otu <- otu_table(phylo_decontam_clean)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
 Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
 dat <- wmeta %>% filter(FamilyNo %in% Family_id) %>% arrange(FamilyNo, Generation)
-otu <- otu_table(phylo_decomtan) %>% as.matrix() %>% as.data.frame() %>% rownames_to_column(var = "id")
-
-shared_lst <- lapply(Family_id, function(fid){
+shared_lst_no_rf <- lapply(Family_id, function(fid){
   wdat <- dat %>% filter(FamilyNo == fid)
-  ft <- otu %>% select(id, wdat$SampleID) %>% column_to_rownames(var = "id") %>% t()
+  ft <- otu %>% dplyr::select(id, wdat$SampleID) %>% column_to_rownames(var = "id") %>% t()
   ft <- ft[,colSums(ft)>0]
   Mom_id <- wdat %>% filter(Generation == "F0") %>% pull(SampleID)
   ft_mom <- ft[pmatch(Mom_id,row.names(ft)),]
@@ -186,11 +322,17 @@ shared_lst <- lapply(Family_id, function(fid){
   })
   res %>% unlist %>% unique()
 })
-names(shared_lst) <- Family_id
+names(shared_lst_no_rf) <- Family_id
 
-shared_lst_no_single <- lapply(Family_id, function(fid){
+otu <- otu_table(phylo_decontam_clean_rf)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
+Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
+dat <- wmeta %>% filter(FamilyNo %in% Family_id) %>% arrange(FamilyNo, Generation)
+shared_lst_rf <- lapply(Family_id, function(fid){
   wdat <- dat %>% filter(FamilyNo == fid)
-  ft <- otu %>% select(id, wdat$SampleID) %>% column_to_rownames(var = "id") %>% t()
+  ft <- otu %>% dplyr::select(id, wdat$SampleID) %>% column_to_rownames(var = "id") %>% t()
   ft <- ft[,colSums(ft)>0]
   Mom_id <- wdat %>% filter(Generation == "F0") %>% pull(SampleID)
   ft_mom <- ft[pmatch(Mom_id,row.names(ft)),]
@@ -204,45 +346,50 @@ shared_lst_no_single <- lapply(Family_id, function(fid){
   })
   res %>% unlist %>% unique()
 })
-names(shared_lst_no_single) <- Family_id
-
+names(shared_lst_rf) <- Family_id
 
 library(ComplexHeatmap)
-
 mat_col_fun = circlize::colorRamp2(c(-4, -3.3, -2.6, -1.9, -1.2, -0.5), c("#253494","#2c7fb8","#41b6c4", "#7fcdbb", "#c7e9b4", "#ffffcc"))
 col_fun = circlize::colorRamp2(c(-2, 0, 2), c("green", "white", "red"))
 taxa_new = taxa %>% mutate(taxa_long = str_c(Family,Genus,Species,ASV, sep = ";"))
 ```
 
-### all 
+### no rf
 ```{r}
-phylo_wk <- prune_samples(wmeta$SampleID, phylo_decomtan_rf)
-ft <- otu_table(phylo_wk@otu_table)  %>% as.data.frame() 
+otu <- otu_table(phylo_decontam_clean)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
+Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
+
+ft <- otu %>% dplyr::select(id, wmeta$SampleID) %>% column_to_rownames(var = "id")
+ft <- sweep(ft, 2, colSums(ft), "/")
 
 #order samples
 meta <- wmeta %>% mutate(Mom_or_Pup = ifelse(Generation == "F0", "Mom", "Pup"),
-                         TP = ifelse(is.na(TimePoint),"At birth", as.character(TimePoint)),
-                         TP = factor(TP, levels = c("At birth", "Week3",  "Week6", "Week9-14", "Week18"))) %>% 
-  filter(FamilyNo %in% Family_id, Seq_count > depth) %>% arrange(TP)
+                         TP = ifelse(is.na(Age_group),"At birth", as.character(Age_group)),
+                         TP = factor(TP, levels = c("At birth", "Week3",  "Week6", "Week9-14", "Week18"))) %>%
+#  filter(FamilyNo %in% Family_id, Seq_count > depth) %>% arrange(TP)
+  filter(FamilyNo %in% Family_id) %>% arrange(TP)
 
-picked_taxa <- shared_lst %>% unlist() %>% unique()
+picked_taxa <- shared_lst_no_rf %>% unlist() %>% unique()
 wft <- ft[picked_taxa, meta %>% pull(SampleID)]
-
-#top 50 
+#top 50
 wft <- wft[(rowSums(wft) %>% sort(.,decreasing = T))[1:50] %>% names(),]
-wft = log10((wft + 0.5)/colSums(ft[,-1])[1])
-wft = wft %>% rownames_to_column(var="id") %>% left_join(taxa_new %>% select(id, taxa_long), by = "id") %>% 
-  select(-id) %>% select(taxa_long, everything())
+wft = log10(wft + 0.00001)
+wft = wft %>% rownames_to_column(var="id") %>% 
+  left_join(taxa_new %>% dplyr::select(id, taxa_long), by = "id") %>% 
+  dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
 #rownames
 wft2 = wft %>% column_to_rownames(var = "taxa_long")
 df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
 #col annotation
-df_col = meta %>% select(Mom_or_Pup, TP)
-column_ha = HeatmapAnnotation(df = df_col %>% select(Mom_or_Pup, TP), 
+df_col = meta %>% dplyr::select(Mom_or_Pup, TP)
+column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select(Mom_or_Pup, TP), 
                               col = list(Mom_or_Pup = c("Pup"="#7fc97f","Mom"="#beaed4"),
-                                         TP = c(TimePoint_color, "At birth"="#feedde")),
+                                         TP = c(Age_color, "At birth"="#feedde")),
                               simple_anno_size = unit(6, "mm"), 
-                              annotation_label = c("", "TimePoint"),
+                              annotation_label = c("", "Age_group"),
                               annotation_name_gp = gpar(fontsize = 14,fontface = "bold"), 
                               annotation_name_side = "left",
                               show_legend = F)
@@ -265,8 +412,8 @@ p1 = Heatmap(as.matrix(wft2),
             height = unit(8, "mm")*dim(wft)[1],
             width = unit(4, "mm")*dim(wft)[2]
             )
-lgd1 = Legend(labels = c("At birth","Week3", "Week6", "Week9-14", "Week18"), title = "TimePoint", 
-              legend_gp = gpar(fill = c(TimePoint_color, "At birth"="#feedde")),
+lgd1 = Legend(labels = c("At birth","Week3", "Week6", "Week9-14", "Week18"), title = "Age_group", 
+              legend_gp = gpar(fill = c("At birth"="#feedde", Age_color)),
               title_position = "topleft", 
               labels_gp = gpar(fontsize = 14, fontface = "bold"),
               title_gp = gpar(fontsize = 14, fontface = "bold"))
@@ -284,43 +431,31 @@ lgd3 = Legend(col_fun = mat_col_fun, title = "Relative abundance",
 pd = packLegend(list = list(lgd1, lgd3), direction = "vertical")
 
 p = draw(p1, annotation_legend_side = "left", annotation_legend_list = pd)
-pdf(file = paste0(temp_out,"sharing_asv_top50_all.pdf"), 
+pdf(file = paste0(temp_out,"sharing_asv_top50_all_no_rf.pdf"), 
     width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
     height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
 draw(p)
 dev.off()
 
-```
-
-### by family
-```{r}
-phylo_wk <- prune_samples(wmeta$SampleID, phylo_decomtan_rf)
-ft <- otu_table(phylo_wk@otu_table)  %>% as.data.frame() 
-
-#order samples
-meta <- wmeta %>% mutate(Mom_or_Pup = ifelse(Generation == "F0", "Mom", "Pup"),
-                         TP = ifelse(is.na(TimePoint),"At birth", as.character(TimePoint)),
-                         TP = factor(TP, levels = c("At birth", "Week3",  "Week6", "Week9-14", "Week18"))) %>% 
-  filter(FamilyNo %in% Family_id, Seq_count > depth) %>% arrange(TP)
-
 for (fid in Family_id){
-  picked_taxa <- shared_lst[[fid]]
+  picked_taxa <- shared_lst_no_rf[[fid]]
   meta_fid <- meta %>% filter(FamilyNo == fid)
   wft <- ft[picked_taxa, meta_fid %>% pull(SampleID)]
+#top 50
   if(nrow(wft)>50){wft <- wft[(rowSums(wft) %>% sort(.,decreasing = T))[1:50] %>% names(),]}
-  wft = log10((wft + 0.5)/colSums(ft[,-1])[1])
-  wft = wft %>% rownames_to_column(var="id") %>% left_join(taxa_new %>% select(id, taxa_long), by = "id") %>% 
-    select(-id) %>% select(taxa_long, everything())
+  wft = log10(wft + 0.00001)
+  wft = wft %>% rownames_to_column(var="id") %>% left_join(taxa_new %>% dplyr::select(id, taxa_long), by = "id") %>% 
+    dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
   #rownames
   wft2 = wft %>% column_to_rownames(var = "taxa_long")
   df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
   #col annotation
-  df_col = meta_fid %>% select(Mom_or_Pup, TP)
-  column_ha = HeatmapAnnotation(df = df_col %>% select(Mom_or_Pup, TP), 
+  df_col = meta_fid %>% dplyr::select(Mom_or_Pup, TP)
+  column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select(Mom_or_Pup, TP), 
                               col = list(Mom_or_Pup = c("Pup"="#7fc97f","Mom"="#beaed4"),
-                                         TP = c(TimePoint_color, "At birth"="#feedde")),
+                                         TP = c("At birth"="#feedde",Age_color)),
                               simple_anno_size = unit(6, "mm"), 
-                              annotation_label = c("", "TimePoint"),
+                              annotation_label = c("", "Age_group"),
                               annotation_name_gp = gpar(fontsize = 14,fontface = "bold"), 
                               annotation_name_side = "left",
                               show_legend = F)
@@ -344,7 +479,7 @@ for (fid in Family_id){
               width = unit(4, "mm")*dim(wft)[2]
               )
   p = draw(p1, annotation_legend_side = "left", annotation_legend_list = pd)
-  pdf(file = paste0(temp_out,"sharing_asv_",fid, ".pdf"), 
+  pdf(file = paste0(temp_out,"sharing_asv_",fid, "_no_rf.pdf"), 
       width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
       height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
   draw(p)
@@ -352,35 +487,42 @@ for (fid in Family_id){
 }
 ```
 
-### all no single
+### rf
 ```{r}
-phylo_wk <- prune_samples(wmeta$SampleID, phylo_decomtan_rf)
-ft <- otu_table(phylo_wk@otu_table)  %>% as.data.frame() 
+otu <- otu_table(phylo_decontam_clean_rf)  %>% as.data.frame() %>% rownames_to_column(var = "id")
+Family_id_all <- meta_all %>% filter(Generation == "F0", SampleID %in% names(otu)[-1]) %>%
+  pull(FamilyNo)
+wmeta <- meta_all %>% filter(FamilyNo %in% Family_id_all, SampleID %in% names(otu)[-1])
+Family_id <- which(table(wmeta$FamilyNo) > 1) %>% names()
+
+ft <- otu %>% dplyr::select(id, wmeta$SampleID) %>% column_to_rownames(var = "id")
+ft <- sweep(ft, 2, colSums(ft), "/")
 
 #order samples
 meta <- wmeta %>% mutate(Mom_or_Pup = ifelse(Generation == "F0", "Mom", "Pup"),
-                         TP = ifelse(is.na(TimePoint),"At birth", as.character(TimePoint)),
-                         TP = factor(TP, levels = c("At birth", "Week3",  "Week6", "Week9-14", "Week18"))) %>% 
-  filter(FamilyNo %in% Family_id, Seq_count > depth) %>% arrange(TP)
+                         TP = ifelse(is.na(Age_group),"At birth", as.character(Age_group)),
+                         TP = factor(TP, levels = c("At birth", "Week3",  "Week6", "Week9-14", "Week18"))) %>%
+#  filter(FamilyNo %in% Family_id, Seq_count > depth) %>% arrange(TP)
+  filter(FamilyNo %in% Family_id) %>% arrange(TP)
 
-picked_taxa <- shared_lst_no_single %>% unlist() %>% unique()
+picked_taxa <- shared_lst_rf %>% unlist() %>% unique()
 wft <- ft[picked_taxa, meta %>% pull(SampleID)]
-
-#top 50 
+#top 50
 wft <- wft[(rowSums(wft) %>% sort(.,decreasing = T))[1:50] %>% names(),]
-wft = log10((wft + 0.5)/colSums(ft[,-1])[1])
-wft = wft %>% rownames_to_column(var="id") %>% left_join(taxa_new %>% select(id, taxa_long), by = "id") %>% 
-  select(-id) %>% select(taxa_long, everything())
+wft = log10(wft + 0.00001)
+wft = wft %>% rownames_to_column(var="id") %>% 
+  left_join(taxa_new %>% dplyr::select(id, taxa_long), by = "id") %>% 
+  dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
 #rownames
 wft2 = wft %>% column_to_rownames(var = "taxa_long")
 df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
 #col annotation
-df_col = meta %>% select(Mom_or_Pup, TP)
-column_ha = HeatmapAnnotation(df = df_col %>% select(Mom_or_Pup, TP), 
+df_col = meta %>% dplyr::select(Mom_or_Pup, TP)
+column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select(Mom_or_Pup, TP), 
                               col = list(Mom_or_Pup = c("Pup"="#7fc97f","Mom"="#beaed4"),
-                                         TP = c(TimePoint_color, "At birth"="#feedde")),
+                                         TP = c(Age_color, "At birth"="#feedde")),
                               simple_anno_size = unit(6, "mm"), 
-                              annotation_label = c("", "TimePoint"),
+                              annotation_label = c("", "Age_group"),
                               annotation_name_gp = gpar(fontsize = 14,fontface = "bold"), 
                               annotation_name_side = "left",
                               show_legend = F)
@@ -403,8 +545,8 @@ p1 = Heatmap(as.matrix(wft2),
             height = unit(8, "mm")*dim(wft)[1],
             width = unit(4, "mm")*dim(wft)[2]
             )
-lgd1 = Legend(labels = c("At birth","Week3", "Week6", "Week9-14", "Week18"), title = "TimePoint", 
-              legend_gp = gpar(fill = c(TimePoint_color, "At birth"="#feedde")),
+lgd1 = Legend(labels = c("At birth","Week3", "Week6", "Week9-14", "Week18"), title = "Age_group", 
+              legend_gp = gpar(fill = c("At birth"="#feedde", Age_color)),
               title_position = "topleft", 
               labels_gp = gpar(fontsize = 14, fontface = "bold"),
               title_gp = gpar(fontsize = 14, fontface = "bold"))
@@ -422,43 +564,31 @@ lgd3 = Legend(col_fun = mat_col_fun, title = "Relative abundance",
 pd = packLegend(list = list(lgd1, lgd3), direction = "vertical")
 
 p = draw(p1, annotation_legend_side = "left", annotation_legend_list = pd)
-pdf(file = paste0(temp_out,"sharing_asv_top50_all_no_single.pdf"), 
+pdf(file = paste0(temp_out,"sharing_asv_top50_all_rf.pdf"), 
     width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
     height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
 draw(p)
 dev.off()
 
-```
-
-### by family no single
-```{r}
-phylo_wk <- prune_samples(wmeta$SampleID, phylo_decomtan_rf)
-ft <- otu_table(phylo_wk@otu_table)  %>% as.data.frame() 
-
-#order samples
-meta <- wmeta %>% mutate(Mom_or_Pup = ifelse(Generation == "F0", "Mom", "Pup"),
-                         TP = ifelse(is.na(TimePoint),"At birth", as.character(TimePoint)),
-                         TP = factor(TP, levels = c("At birth", "Week3",  "Week6", "Week9-14", "Week18"))) %>% 
-  filter(FamilyNo %in% Family_id, Seq_count > depth) %>% arrange(TP)
-
 for (fid in Family_id){
-  picked_taxa <- shared_lst_no_single[[fid]]
+  picked_taxa <- shared_lst_rf[[fid]]
   meta_fid <- meta %>% filter(FamilyNo == fid)
   wft <- ft[picked_taxa, meta_fid %>% pull(SampleID)]
+#top 50
   if(nrow(wft)>50){wft <- wft[(rowSums(wft) %>% sort(.,decreasing = T))[1:50] %>% names(),]}
-  wft = log10((wft + 0.5)/colSums(ft[,-1])[1])
-  wft = wft %>% rownames_to_column(var="id") %>% left_join(taxa_new %>% select(id, taxa_long), by = "id") %>% 
-    select(-id) %>% select(taxa_long, everything())
+  wft = log10(wft + 0.00001)
+  wft = wft %>% rownames_to_column(var="id") %>% left_join(taxa_new %>% dplyr::select(id, taxa_long), by = "id") %>% 
+    dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
   #rownames
   wft2 = wft %>% column_to_rownames(var = "taxa_long")
   df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
   #col annotation
-  df_col = meta_fid %>% select(Mom_or_Pup, TP)
-  column_ha = HeatmapAnnotation(df = df_col %>% select(Mom_or_Pup, TP), 
+  df_col = meta_fid %>% dplyr::select(Mom_or_Pup, TP)
+  column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select(Mom_or_Pup, TP), 
                               col = list(Mom_or_Pup = c("Pup"="#7fc97f","Mom"="#beaed4"),
-                                         TP = c(TimePoint_color, "At birth"="#feedde")),
+                                         TP = c("At birth"="#feedde",Age_color)),
                               simple_anno_size = unit(6, "mm"), 
-                              annotation_label = c("", "TimePoint"),
+                              annotation_label = c("", "Age_group"),
                               annotation_name_gp = gpar(fontsize = 14,fontface = "bold"), 
                               annotation_name_side = "left",
                               show_legend = F)
@@ -482,13 +612,14 @@ for (fid in Family_id){
               width = unit(4, "mm")*dim(wft)[2]
               )
   p = draw(p1, annotation_legend_side = "left", annotation_legend_list = pd)
-  pdf(file = paste0(temp_out,"sharing_asv_",fid, "_no_single.pdf"), 
+  pdf(file = paste0(temp_out,"sharing_asv_",fid, "_rf.pdf"), 
       width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
       height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
   draw(p)
   dev.off()
 }
 ```
+
 
 
 

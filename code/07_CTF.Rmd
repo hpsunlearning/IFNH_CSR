@@ -1,0 +1,64 @@
+---
+title: "CTF"
+author: "Haipeng Sun"
+date: "7/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## library
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(phyloseq)
+library(Hmisc)
+library(agricolae)
+library(grid)
+library(gridExtra)
+library(gtable)
+library(ggrepel)
+library(phyloseq)
+library(usedist)
+library(purrr)
+library(furrr)
+library(rlist)
+library(ggpubr)
+library(biomformat)
+library(tidyverse)
+```
+
+## load data
+```{r}
+load(file = "../data/BW_and_phylo.RData")
+temp_out = "../result/ctf/"
+```
+
+## export feature table to qiime2
+```{r}
+meta <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
+names(meta) <- phylo_decontam_clean_rf@sam_data@names
+meta$SampleID <- phylo_decontam_clean_rf@sam_data@row.names 
+meta <- meta %>% filter(Generation == "F1") %>% 
+  mutate(Age_group = as.numeric(Age_group)) %>% 
+  select(SampleID, MouseID, BirthMode, Age_group, TimePointInWeeks)
+write.table(meta %>% select(SampleID, everything()), file = "../data/decontam_clean_rf_pup.txt", 
+            sep = "\t", quote = F, append = F, row.names = F)
+
+otu <- as(otu_table(prune_samples(meta$SampleID, phylo_decontam_clean_rf)), "matrix")
+otu <- otu[rowSums(otu) > 0,]
+otu_biom <- make_biom(data=otu)
+write_biom(otu_biom,"../data/decontam_clean_rf_pup_otu.biom")
+
+
+
+
+
+
+
+
+
+
+
+```
+

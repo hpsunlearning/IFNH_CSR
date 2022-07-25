@@ -1,37 +1,37 @@
-2022-07-21 21:37:37 INFO::Writing function arguments to log file
-2022-07-21 21:37:37 DEBUG::Function arguments
-2022-07-21 21:37:37 DEBUG::Output folder: ../result/taxa/maaslin2/Week9-14_Species
-2022-07-21 21:37:37 DEBUG::Min Abundance: 0.000000
-2022-07-21 21:37:37 DEBUG::Min Prevalence: 0.100000
-2022-07-21 21:37:37 DEBUG::Normalization: TSS
-2022-07-21 21:37:37 DEBUG::Transform: LOG
-2022-07-21 21:37:37 DEBUG::Analysis method: LM
-2022-07-21 21:37:37 DEBUG::Max significance: 0.100000
-2022-07-21 21:37:37 DEBUG::Random effects:
-2022-07-21 21:37:37 DEBUG::Fixed effects: BirthMode,Sex
-2022-07-21 21:37:37 DEBUG::Correction method: BH
-2022-07-21 21:37:37 DEBUG::Standardize: TRUE
-2022-07-21 21:37:37 DEBUG::Cores: 4
-2022-07-21 21:37:37 INFO::Verifying options selected are valid
-2022-07-21 21:37:37 INFO::Determining format of input files
-2022-07-21 21:37:37 INFO::Input format is data samples as rows and metadata samples as rows
-2022-07-21 21:37:37 DEBUG::A total of 70 samples were found in both the data and metadata
-2022-07-21 21:37:37 DEBUG::Reordering data/metadata to use same sample ordering
-2022-07-21 21:37:37 INFO::Formula for fixed effects: expr ~  BirthMode + Sex
-2022-07-21 21:37:37 INFO::Filter data based on min abundance and min prevalence
-2022-07-21 21:37:37 INFO::Total samples in data: 70
-2022-07-21 21:37:37 INFO::Min samples required with min abundance for a feature not to be filtered: 7.000000
-2022-07-21 21:37:37 INFO::Total filtered features: 203
-2022-07-21 21:37:37 INFO::Filtered feature names from abundance and prevalence filtering:
-2022-07-21 21:37:37 INFO::Total filtered features with variance filtering: 0
-2022-07-21 21:37:37 INFO::Filtered feature names from variance filtering:
-2022-07-21 21:37:37 INFO::Running selected normalization method: TSS
-2022-07-21 21:37:37 INFO::Applying z-score to standardize continuous metadata
-2022-07-21 21:37:37 INFO::Running selected transform method: LOG
-2022-07-21 21:37:37 INFO::Running selected analysis method: LM
-2022-07-21 21:37:37 INFO::Creating cluster of 4 R processes
-2022-07-21 21:37:44 INFO::Counting total values for each feature
-2022-07-21 21:37:44 INFO::Writing residuals to file ../result/taxa/maaslin2/Week9-14_Species/residuals.rds
-2022-07-21 21:37:44 INFO::Writing fitted values to file ../result/taxa/maaslin2/Week9-14_Species/fitted.rds
-2022-07-21 21:37:44 INFO::Writing all results to file (ordered by increasing q-values): ../result/taxa/maaslin2/Week9-14_Species/all_results.tsv
-2022-07-21 21:37:44 INFO::Writing the significant results (those which are less than or equal to the threshold of 0.100000 ) to file (ordered by increasing q-values): ../result/taxa/maaslin2/Week9-14_Species/significant_results.tsv
+2022-07-25 13:47:51 INFO::Writing function arguments to log file
+2022-07-25 13:47:51 DEBUG::Function arguments
+2022-07-25 13:47:51 DEBUG::Output folder: ../result/taxa/maaslin2/Week9-14_Species
+2022-07-25 13:47:51 DEBUG::Min Abundance: 0.000000
+2022-07-25 13:47:51 DEBUG::Min Prevalence: 0.100000
+2022-07-25 13:47:51 DEBUG::Normalization: TSS
+2022-07-25 13:47:51 DEBUG::Transform: LOG
+2022-07-25 13:47:51 DEBUG::Analysis method: LM
+2022-07-25 13:47:51 DEBUG::Max significance: 0.100000
+2022-07-25 13:47:51 DEBUG::Random effects:
+2022-07-25 13:47:51 DEBUG::Fixed effects: BirthMode,Sex
+2022-07-25 13:47:51 DEBUG::Correction method: BH
+2022-07-25 13:47:51 DEBUG::Standardize: TRUE
+2022-07-25 13:47:51 DEBUG::Cores: 4
+2022-07-25 13:47:51 INFO::Verifying options selected are valid
+2022-07-25 13:47:51 INFO::Determining format of input files
+2022-07-25 13:47:51 INFO::Input format is data samples as rows and metadata samples as rows
+2022-07-25 13:47:51 DEBUG::A total of 70 samples were found in both the data and metadata
+2022-07-25 13:47:51 DEBUG::Reordering data/metadata to use same sample ordering
+2022-07-25 13:47:51 INFO::Formula for fixed effects: expr ~  BirthMode + Sex
+2022-07-25 13:47:51 INFO::Filter data based on min abundance and min prevalence
+2022-07-25 13:47:51 INFO::Total samples in data: 70
+2022-07-25 13:47:51 INFO::Min samples required with min abundance for a feature not to be filtered: 7.000000
+2022-07-25 13:47:51 INFO::Total filtered features: 181
+2022-07-25 13:47:51 INFO::Filtered feature names from abundance and prevalence filtering:
+2022-07-25 13:47:51 INFO::Total filtered features with variance filtering: 0
+2022-07-25 13:47:51 INFO::Filtered feature names from variance filtering:
+2022-07-25 13:47:51 INFO::Running selected normalization method: TSS
+2022-07-25 13:47:51 INFO::Applying z-score to standardize continuous metadata
+2022-07-25 13:47:51 INFO::Running selected transform method: LOG
+2022-07-25 13:47:51 INFO::Running selected analysis method: LM
+2022-07-25 13:47:51 INFO::Creating cluster of 4 R processes
+2022-07-25 13:47:57 INFO::Counting total values for each feature
+2022-07-25 13:47:57 INFO::Writing residuals to file ../result/taxa/maaslin2/Week9-14_Species/residuals.rds
+2022-07-25 13:47:57 INFO::Writing fitted values to file ../result/taxa/maaslin2/Week9-14_Species/fitted.rds
+2022-07-25 13:47:57 INFO::Writing all results to file (ordered by increasing q-values): ../result/taxa/maaslin2/Week9-14_Species/all_results.tsv
+2022-07-25 13:47:57 INFO::Writing the significant results (those which are less than or equal to the threshold of 0.100000 ) to file (ordered by increasing q-values): ../result/taxa/maaslin2/Week9-14_Species/significant_results.tsv
