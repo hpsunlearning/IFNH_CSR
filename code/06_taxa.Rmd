@@ -229,7 +229,29 @@ for (ll in c("ASV","Species","Genus","Family","Order","Class","Phylum")){
 }
 
 #save(picked_feature, file = "../data/picked_feature.Rdata")
-#load(file = "../data/picked_feature.Rdata")
+load(file = "../data/picked_feature.Rdata")
+
+lapply(c("All_Age_group", "Week3", "Week6", "Week9-14", "Week18"), function(tp){
+  m_n <- length(picked_feature)
+  
+  
+  
+})
+
+map_lst <-list(taxrank = c("ASV","Species","Genus","Family","Order","Class","Phylum"), 
+     Age_group = c("All_Age_group", "Week3", "Week6", "Week9-14", "Week18")) %>% cross()
+res <- map_dfr(map_lst, function(x){
+  m_lst <- picked_feature[[x$taxrank]][["BrithMode"]][[x$Age_group]]$maaslin2
+  a_lst <- picked_feature[[x$taxrank]][["BrithMode"]][[x$Age_group]]$ancombc
+  res <- data.frame(level = x$taxrank, Age_group = x$Age_group,
+                    maaslin2 = length(m_lst),
+                    ancombc = length(a_lst),
+                    common = length(intersect(m_lst, a_lst)))
+  res
+})
+write.csv(res %>% arrange(level, Age_group),
+          file = paste0(temp_out,"feature_number_picked_birthmode.csv"),
+          quote = F, row.names = F)
 ```
 
 ## heatmaps
@@ -238,20 +260,18 @@ library(ComplexHeatmap)
 
 mat_col_fun = circlize::colorRamp2(c(-4, -3.3, -2.6, -1.9, -1.2, -0.5), c("#253494","#2c7fb8","#41b6c4", "#7fcdbb", "#c7e9b4", "#ffffcc"))
 col_fun = circlize::colorRamp2(c(-2, 0, 2), c("green", "white", "red"))
-taxa_new = taxa %>% mutate(taxa_long = str_c(Kingdom,Phylum,Class,Order,Family,Genus,Species, sep = ";"),
-                           taxa_long = str_replace(taxa_long, "k_d_","k"))
+taxa_new = taxa %>% mutate(taxa_long = str_c(Family,Genus,Species, sep = ";"))
 ```
 
 ### use ancombc species level result to plot time point
 ```{r }
-meta <- phylo_decomtan_rf@sam_data@.Data %>% as.data.frame()
-names(meta) <- phylo_decomtan_rf@sam_data@names
-meta$SampleID <- phylo_decomtan_rf@sam_data@row.names
+meta <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
+names(meta) <- phylo_decontam_clean_rf@sam_data@names
+meta$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
 meta <- meta %>% filter(Generation == "F1")
-phylo_wk <- prune_samples(meta$SampleID, phylo_decomtan_rf)
+phylo_wk <- prune_samples(meta$SampleID, phylo_decontam_clean_rf)
 phylo_s <- tax_glom(phylo_wk, taxrank = "Species", NArm = F)
 ft <- otu_table(phylo_s@otu_table)  %>% as.data.frame() 
-
 
 #order samples
 meta <- meta %>% arrange(Age_group, BirthMode, Sex)
@@ -268,10 +288,10 @@ df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
 #col annotation
 df_col = meta %>% dplyr::select(Age_group, BirthMode, Sex)
 column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select(Age_group, BirthMode), 
-                              col = list(Age_group = Age_group_color,
+                              col = list(Age_group = Age_color,
                                          BirthMode = BirthMode_color),
                               simple_anno_size = unit(6, "mm"), 
-                              annotation_label = c("Time point", "BirthMode"),
+                              annotation_label = c("Age group", "BirthMode"),
                               annotation_name_gp = gpar(fontsize = 14,fontface = "bold"), 
                               annotation_name_side = "left",
                               show_legend = F)
@@ -293,8 +313,8 @@ p1 = Heatmap(as.matrix(wft2),
             height = unit(8, "mm")*dim(wft)[1],
             width = unit(1, "mm")*dim(wft)[2]
             )
-lgd1 = Legend(labels = c("Week3", "Week6", "Week9-14", "Week18"), title = "Age_group", 
-              legend_gp = gpar(fill = Age_group_color),
+lgd1 = Legend(labels = c("Week3", "Week6", "Week9-14", "Week18"), title = "Age group", 
+              legend_gp = gpar(fill = Age_color),
               title_position = "topleft", 
               labels_gp = gpar(fontsize = 14, fontface = "bold"),
               title_gp = gpar(fontsize = 14, fontface = "bold"))
@@ -342,11 +362,11 @@ dev.off()
 
 ### use ancombc species level result to plot birthmode
 ```{r }
-meta <- phylo_decomtan_rf@sam_data@.Data %>% as.data.frame()
-names(meta) <- phylo_decomtan_rf@sam_data@names
-meta$SampleID <- phylo_decomtan_rf@sam_data@row.names
+meta <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
+names(meta) <- phylo_decontam_clean_rf@sam_data@names
+meta$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
 meta <- meta %>% filter(Generation == "F1")
-phylo_wk <- prune_samples(meta$SampleID, phylo_decomtan_rf)
+phylo_wk <- prune_samples(meta$SampleID, phylo_decontam_clean_rf)
 phylo_s <- tax_glom(phylo_wk, taxrank = "Species", NArm = F)
 ft <- otu_table(phylo_s@otu_table)  %>% as.data.frame() 
 
@@ -363,11 +383,11 @@ wft2 = wft %>% column_to_rownames(var = "taxa_long")
 df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
 #col annotation
 df_col = meta %>% dplyr::select(Age_group, BirthMode, Sex)
-column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select( BirthMode,Age_group), 
-                              col = list(Age_group = Age_group_color,
+column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select(Age_group,BirthMode), 
+                              col = list(Age_group = Age_color,
                                          BirthMode = BirthMode_color),
                               simple_anno_size = unit(6, "mm"), 
-                              annotation_label = c("Time point", "BirthMode"),
+                              annotation_label = c("Age Group", "BirthMode"),
                               annotation_name_gp = gpar(fontsize = 14,fontface = "bold"), 
                               annotation_name_side = "left",
                               show_legend = F)
@@ -389,8 +409,8 @@ p1 = Heatmap(as.matrix(wft2),
             height = unit(8, "mm")*dim(wft)[1],
             width = unit(1, "mm")*dim(wft)[2]
             )
-lgd1 = Legend(labels = c("Week3", "Week6", "Week9-14", "Week18"), title = "Age_group", 
-              legend_gp = gpar(fill = Age_group_color),
+lgd1 = Legend(labels = c("Week3", "Week6", "Week9-14", "Week18"), title = "Age group", 
+              legend_gp = gpar(fill = Age_color),
               title_position = "topleft", 
               labels_gp = gpar(fontsize = 14, fontface = "bold"),
               title_gp = gpar(fontsize = 14, fontface = "bold"))
@@ -435,3 +455,198 @@ draw(p)
 dev.off()
 
 ```
+
+### use maaslin2 species level result to plot time point
+```{r }
+meta <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
+names(meta) <- phylo_decontam_clean_rf@sam_data@names
+meta$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
+meta <- meta %>% filter(Generation == "F1")
+phylo_wk <- prune_samples(meta$SampleID, phylo_decontam_clean_rf)
+phylo_s <- tax_glom(phylo_wk, taxrank = "Species", NArm = F)
+ft <- otu_table(phylo_s@otu_table)  %>% as.data.frame() 
+
+#order samples
+meta <- meta %>% arrange(Age_group, BirthMode, Sex)
+picked_taxa <- picked_feature$Species$Age_group$All_Age_group$maaslin2 %>% unique()
+wft <- ft[picked_taxa, meta %>% pull(SampleID)]
+#top 50 
+wft <- wft[(rowSums(wft) %>% sort(.,decreasing = T))[1:50] %>% names(),]
+wft = log10((wft + 0.5)/colSums(ft[,-1])[1])
+wft = wft %>% rownames_to_column(var="id") %>% left_join(taxa_new %>% dplyr::select(id, taxa_long), by = "id") %>% 
+  dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
+#rownames
+wft2 = wft %>% column_to_rownames(var = "taxa_long")
+df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
+#col annotation
+df_col = meta %>% dplyr::select(Age_group, BirthMode, Sex)
+column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select(Age_group, BirthMode), 
+                              col = list(Age_group = Age_color,
+                                         BirthMode = BirthMode_color),
+                              simple_anno_size = unit(6, "mm"), 
+                              annotation_label = c("Age group", "BirthMode"),
+                              annotation_name_gp = gpar(fontsize = 14,fontface = "bold"), 
+                              annotation_name_side = "left",
+                              show_legend = F)
+#row dend order
+row_dend = as.dendrogram(hclust(dist(wft2)))
+#heatmap
+p1 = Heatmap(as.matrix(wft2), 
+            col = mat_col_fun, 
+            #name = "Relative Abundance",
+            show_heatmap_legend = F,
+            cluster_columns = F, show_column_names = F,
+            #column_split = df_col$SamplingAge_group,
+            cluster_rows = row_dend,
+            row_names_gp = gpar(fontsize = 14),
+            row_labels = df_row_name_label,
+            row_dend_width = unit(15, "mm"),
+            row_names_max_width = max_text_width(df_row_name_label, gp = gpar(fontsize = 14)),
+            top_annotation = column_ha,
+            height = unit(8, "mm")*dim(wft)[1],
+            width = unit(1, "mm")*dim(wft)[2]
+            )
+lgd1 = Legend(labels = c("Week3", "Week6", "Week9-14", "Week18"), title = "Age group", 
+              legend_gp = gpar(fill = Age_color),
+              title_position = "topleft", 
+              labels_gp = gpar(fontsize = 14, fontface = "bold"),
+              title_gp = gpar(fontsize = 14, fontface = "bold"))
+lgd2 = Legend(labels = c("CS","CSR","VF"), title = "BirthMode", 
+              legend_gp = gpar(fill = BirthMode_color),
+              title_position = "topleft", 
+              labels_gp = gpar(fontsize = 14, fontface = "bold"),
+              title_gp = gpar(fontsize = 14, fontface = "bold"))
+lgd3 = Legend(col_fun = mat_col_fun, title = "Relative abundance", 
+              at = c(-4, -3.3, -2.6, -1.9, -1.2, -0.5),                 
+              labels = c("0.01%", "0.05%", "0.25%", "1.25%", "6.25%", "31.25%"), 
+              title_position = "topleft",
+              labels_gp = gpar(fontsize = 14, fontface = "bold"), 
+              title_gp = gpar(fontsize = 14, fontface = "bold"))
+pd = packLegend(list = list(lgd1, lgd2, lgd3), direction = "vertical")
+
+p = draw(p1, annotation_legend_side = "left", annotation_legend_list = pd)
+pdf(file = paste0(temp_out,"maaslin2_Age_group_s_supervised.pdf"), 
+    width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
+    height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
+draw(p)
+dev.off()
+
+p2 = Heatmap(as.matrix(wft2), 
+            col = mat_col_fun, 
+            show_heatmap_legend = F,
+            cluster_columns = T, show_column_names = F,
+            cluster_rows = row_dend,
+            row_names_gp = gpar(fontsize = 14),
+            row_labels = df_row_name_label,
+            row_dend_width = unit(15, "mm"),
+            row_names_max_width = max_text_width(df_row_name_label, gp = gpar(fontsize = 14)),
+            top_annotation = column_ha,
+            height = unit(8, "mm")*dim(wft)[1],
+            width = unit(1, "mm")*dim(wft)[2]
+            )
+p = draw(p2, annotation_legend_side = "left", annotation_legend_list = pd)
+pdf(file = paste0(temp_out,"maaslin2_Age_group_s_unsupervised.pdf"), 
+    width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
+    height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
+draw(p)
+dev.off()
+
+```
+
+### use maaslin2 species level result to plot birthmode
+```{r }
+meta <- phylo_decontam_clean_rf@sam_data@.Data %>% as.data.frame()
+names(meta) <- phylo_decontam_clean_rf@sam_data@names
+meta$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
+meta <- meta %>% filter(Generation == "F1")
+phylo_wk <- prune_samples(meta$SampleID, phylo_decontam_clean_rf)
+phylo_s <- tax_glom(phylo_wk, taxrank = "Species", NArm = F)
+ft <- otu_table(phylo_s@otu_table)  %>% as.data.frame() 
+
+#order samples
+meta <- meta %>% arrange(BirthMode,Age_group,  Sex)
+picked_taxa <- picked_feature$Species$BrithMode$All_Age_group$maaslin2 %>% unique()
+wft <- ft[picked_taxa, meta %>% pull(SampleID)]
+
+wft = log10((wft + 0.5)/colSums(ft[,-1])[1])
+wft = wft %>% rownames_to_column(var="id") %>% left_join(taxa_new %>% dplyr::select(id, taxa_long), by = "id") %>% 
+  dplyr::select(-id) %>% dplyr::select(taxa_long, everything())
+#rownames
+wft2 = wft %>% column_to_rownames(var = "taxa_long")
+df_row_name_label = structure(rownames(wft2), names = rownames(wft2))
+#col annotation
+df_col = meta %>% dplyr::select(Age_group, BirthMode, Sex)
+column_ha = HeatmapAnnotation(df = df_col %>% dplyr::select( Age_group,BirthMode), 
+                              col = list(Age_group = Age_color,
+                                         BirthMode = BirthMode_color),
+                              simple_anno_size = unit(6, "mm"), 
+                              annotation_label = c("Age Group", "BirthMode"),
+                              annotation_name_gp = gpar(fontsize = 14,fontface = "bold"), 
+                              annotation_name_side = "left",
+                              show_legend = F)
+#row dend order
+row_dend = as.dendrogram(hclust(dist(wft2)))
+#heatmap
+p1 = Heatmap(as.matrix(wft2), 
+            col = mat_col_fun, 
+            #name = "Relative Abundance",
+            show_heatmap_legend = F,
+            cluster_columns = F, show_column_names = F,
+            #column_split = df_col$SamplingAge_group,
+            cluster_rows = row_dend,
+            row_names_gp = gpar(fontsize = 14),
+            row_labels = df_row_name_label,
+            row_dend_width = unit(15, "mm"),
+            row_names_max_width = max_text_width(df_row_name_label, gp = gpar(fontsize = 14)),
+            top_annotation = column_ha,
+            height = unit(8, "mm")*dim(wft)[1],
+            width = unit(1, "mm")*dim(wft)[2]
+            )
+lgd1 = Legend(labels = c("Week3", "Week6", "Week9-14", "Week18"), title = "Age group", 
+              legend_gp = gpar(fill = Age_color),
+              title_position = "topleft", 
+              labels_gp = gpar(fontsize = 14, fontface = "bold"),
+              title_gp = gpar(fontsize = 14, fontface = "bold"))
+lgd2 = Legend(labels = c("CS","CSR","VF"), title = "BirthMode", 
+              legend_gp = gpar(fill = BirthMode_color),
+              title_position = "topleft", 
+              labels_gp = gpar(fontsize = 14, fontface = "bold"),
+              title_gp = gpar(fontsize = 14, fontface = "bold"))
+lgd3 = Legend(col_fun = mat_col_fun, title = "Relative abundance", 
+              at = c(-4, -3.3, -2.6, -1.9, -1.2, -0.5),                 
+              labels = c("0.01%", "0.05%", "0.25%", "1.25%", "6.25%", "31.25%"), 
+              title_position = "topleft",
+              labels_gp = gpar(fontsize = 14, fontface = "bold"), 
+              title_gp = gpar(fontsize = 14, fontface = "bold"))
+pd = packLegend(list = list(lgd1, lgd2, lgd3), direction = "vertical")
+
+p = draw(p1, annotation_legend_side = "left", annotation_legend_list = pd)
+pdf(file = paste0(temp_out,"maaslin2_birthmode_s_supervised.pdf"), 
+    width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
+    height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
+draw(p)
+dev.off()
+
+p2 = Heatmap(as.matrix(wft2), 
+            col = mat_col_fun, 
+            show_heatmap_legend = F,
+            cluster_columns = T, show_column_names = F,
+            cluster_rows = row_dend,
+            row_names_gp = gpar(fontsize = 14),
+            row_labels = df_row_name_label,
+            row_dend_width = unit(15, "mm"),
+            row_names_max_width = max_text_width(df_row_name_label, gp = gpar(fontsize = 14)),
+            top_annotation = column_ha,
+            height = unit(8, "mm")*dim(wft)[1],
+            width = unit(1, "mm")*dim(wft)[2]
+            )
+p = draw(p2, annotation_legend_side = "left", annotation_legend_list = pd)
+pdf(file = paste0(temp_out,"maaslin2_birthmode_s_unsupervised.pdf"), 
+    width = ComplexHeatmap:::width(p) %>% as.numeric()/25.4, 
+    height = ComplexHeatmap:::height(p) %>% as.numeric()/25.4, useDingbats = F)
+draw(p)
+dev.off()
+
+```
+
+

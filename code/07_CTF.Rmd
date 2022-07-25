@@ -12,19 +12,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ## library
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 library(phyloseq)
-library(Hmisc)
-library(agricolae)
+library(qiime2R)
 library(grid)
 library(gridExtra)
 library(gtable)
 library(ggrepel)
 library(phyloseq)
 library(usedist)
-library(purrr)
-library(furrr)
 library(rlist)
 library(ggpubr)
 library(biomformat)
+library(vegan)
 library(tidyverse)
 ```
 
@@ -42,18 +40,152 @@ meta$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
 meta <- meta %>% filter(Generation == "F1") %>% 
   mutate(Age_group = as.numeric(Age_group)) %>% 
   select(SampleID, MouseID, BirthMode, Age_group, TimePointInWeeks)
-write.table(meta %>% select(SampleID, everything()), file = "../data/decontam_clean_rf_pup.txt", 
+write.table(meta %>% select(SampleID, everything()), file = "../data/07_ctf/decontam_clean_rf_pup.txt", 
             sep = "\t", quote = F, append = F, row.names = F)
 
 otu <- as(otu_table(prune_samples(meta$SampleID, phylo_decontam_clean_rf)), "matrix")
 otu <- otu[rowSums(otu) > 0,]
 otu_biom <- make_biom(data=otu)
-write_biom(otu_biom,"../data/decontam_clean_rf_pup_otu.biom")
+write_biom(otu_biom,"../data/07_ctf/decontam_clean_rf_pup_otu.biom")
+```
+
+## run CTF in QIIME2
+```{bash eval=FALSE, include=TRUE}
+conda activate qiime2-2020.8
+
+qiime tools import \
+    --input-path 07_ctf/decontam_clean_rf_pup_otu.biom \
+    --type 'FeatureTable[Frequency]' \
+    --input-format BIOMV100Format \
+    --output-path 07_ctf/table_decontam_clean_rf_pup.qza
+
+qiime gemelli ctf \
+    --i-table  07_ctf/table_decontam_clean_rf_pup.qza  \
+    --m-sample-metadata-file 07_ctf/decontam_clean_rf_pup.txt \
+    --p-individual-id-column MouseID \
+    --p-state-column TimePointInWeeks \
+    --m-feature-metadata-file 05_taxa/taxonomy_all_silva138.qza \
+    --output-dir 07_ctf/weeks_results
+    
+qiime longitudinal volatility \
+    --m-metadata-file 07_ctf/age_group_results/state_subject_ordination.qza \
+    --p-state-column TimePointInWeeks \
+    --p-individual-id-column subject_id \
+    --p-default-group-column BirthMode \
+    --p-default-metric PC1 \
+    --o-visualization 07_ctf/weeks_results/Weeks_BirthMode_ordination.qzv
+```
+
+## import ctf result to R
+```{r}
+qza_obj <- read_qza("../data/07_ctf/weeks_results/distance_matrix.qza")
+DM_ctf <- qza_obj$data
+# read_qza doesn't support "trajectory.tsv", have to unzip it
+#qza_obj <- read_qza("../data/07_ctf/weeks_results/state_subject_ordination.qza")
+unzip("../data/07_ctf/weeks_results/state_subject_ordination.qza",
+      exdir = "../data/07_ctf/weeks_results/state_subject_ordination")
+unzip("../data/07_ctf/weeks_results/state_feature_ordination.qza",
+      exdir = "../data/07_ctf/weeks_results/state_feature_ordination")
+unzip("../data/07_ctf/weeks_results/Weeks_BirthMode_ordination.qzv",
+      exdir = "../data/07_ctf/weeks_results/Weeks_BirthMode_ordination")
+
+ord_birthmod <- read.table("../data/07_ctf/weeks_results/Weeks_BirthMode_ordination/38e93f60-6067-4e35-b2cf-f9bd11979756/data/data.tsv",  sep = "\t", header = F) %>% 
+  transmute(SampleID = V1, PC1 = V2, PC2 = V3, PC3 = V4) %>% 
+  left_join(meta_all, by = "SampleID")
+wmeta <- ord_birthmod %>% select(-c(PC1,PC2,PC3))
+
+```
+
+## create rda from distance
+```{r}
+calcOmega2_dm <- function(x) {
+    # Computes the effect size omega^2 parital using the output from adonis test
+    # Args:
+    #   x: adonis output
+    # Returns:
+    #   A dataframe with calculated effect size omega^2 partial added to original dataframe
+    require(dplyr)
+    N_t = x["Total", ]$Df + 1
+    MSe = x["Residual", ]$SumOfSqs/x["Residual", ]$Df
+    out = x %>% as.data.frame %>% rownames_to_column(var = "Variable") %>% mutate(Omega2_partial = ifelse(is.na(`F`), NA, (SumOfSqs - Df * MSe)/(SumOfSqs + (N_t - Df) * MSe)))
+    return(out)
+}
+
+wrda <- dbrda(DM_ctf ~ 1)
+wrda_eig <- eigenvals(wrda)
+varPC1 <- round(wrda_eig[1]/sum(wrda_eig)*100,2)
+varPC2 <- round(wrda_eig[2]/sum(wrda_eig)*100,2)
+wrda_fit <- envfit(wrda ~ BirthMode + Sex, data = wmeta)
+calcOmega2_dm(adonis2(DM_ctf ~ BirthMode + Sex, data = wmeta, by = "margin"))
+
+wdat_rda <- merge(wrda$CA$u[,1:2], wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
+    rename(PC1 = MDS1, PC2 = MDS2)
+
+## plot from rda
+g <- ggplot(wdat_rda, aes(x = Age_group, y = PC1)) + 
+      geom_boxplot(aes(color=BirthMode, fill=BirthMode), alpha = 0.5, outlier.alpha = 0) + 
+      geom_point(aes(color=BirthMode), position = position_dodge2(width = 0.6)) + 
+      stat_compare_means(aes(group = BirthMode), hide.ns = T, label =  "p.signif") +
+      scale_color_manual(values = BirthMode_color, aesthetics = c("color","fill")) + 
+      labs(x="",y="PC1") +
+      theme_bw() + theme(aspect.ratio = 1,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+
+g <- ggplot(wdat_rda, aes(x = TimePointInWeeks, y = PC1)) + 
+  geom_point(aes(color=BirthMode)) + 
+  geom_path(aes(color=BirthMode, group=MouseID)) 
 
 
 
+## plot from ctf
+g <- ggplot(ord_birthmod, aes(x = Age_group, y = PC1)) + 
+      geom_boxplot(aes(color=BirthMode, fill=BirthMode), alpha = 0.5, outlier.alpha = 0) + 
+      geom_point(aes(color=BirthMode), position = position_dodge2(width = 0.6)) + 
+      stat_compare_means(aes(group = BirthMode), hide.ns = T, label =  "p.signif") +
+      scale_color_manual(values = BirthMode_color, aesthetics = c("color","fill")) + 
+      labs(x="",y="PC1") +
+      theme_bw() + theme(aspect.ratio = 1,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = paste0(temp_out,"BirthMode_ctf_pc1_compare.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)
 
-
+g <- ggplot(ord_birthmod,aes(x = Age_group, y = PC1)) + 
+  geom_point(aes(color=BirthMode), size=0.5, alpha=0.5) + 
+  geom_path(aes(color=BirthMode, group=MouseID), size=0.5, alpha=0.2) + 
+  geom_path(data = ord_birthmod %>% 
+              group_by(Age_group, BirthMode) %>% 
+              summarise(PC1 = mean(PC1)) %>% ungroup(), 
+            aes(x=Age_group, y=PC1, group=BirthMode, color=BirthMode), size = 1.5) +
+  scale_color_manual(values = BirthMode_color, aesthetics = c("color","fill")) + 
+      labs(x="",y="PC1") +
+      theme_bw() + theme(aspect.ratio = 1,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))
+ggsave(filename = paste0(temp_out,"BirthMode_ctf_pc1.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)
 
 
 
@@ -61,4 +193,14 @@ write_biom(otu_biom,"../data/decontam_clean_rf_pup_otu.biom")
 
 
 ```
+
+
+
+
+
+
+
+
+
+
 
