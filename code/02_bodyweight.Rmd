@@ -25,8 +25,8 @@ library(tidyverse)
 
 ## load data
 ```{r}
-load(file = "../data/BW_and_phylo.RData")
-temp_out = "../result/bodyweight/"
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
+temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/bodyweight/"
 ```
 
 ## plot data
@@ -237,13 +237,13 @@ at_week15 <- BW %>% filter(TimePoint_Weeks == 15) %>%
          Underweight = ifelse(BW_status == "Underweight", "Y", "N")
          )
 save(BW_f_centile, BW_m_centile, at_week15,
-     file = paste0("../data/BW_responder.RData"))
+     file = paste0(data_path,"BW_responder.RData"))
 ```
 
 ### plot
 ```{r}
 dat <- BW %>% left_join(at_week15 %>% 
-                          select(MouseID, BW_status, Overweight, Underweight), 
+                          dplyr::select(MouseID, BW_status, Overweight, Underweight), 
                         by = "MouseID") %>% 
   filter(!is.na(BW_status)) 
 

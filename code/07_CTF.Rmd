@@ -28,8 +28,8 @@ library(tidyverse)
 
 ## load data
 ```{r}
-load(file = "../data/BW_and_phylo.RData")
-temp_out = "../result/ctf/"
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
+temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/ctf/"
 ```
 
 ## export feature table to qiime2
@@ -40,13 +40,14 @@ meta$SampleID <- phylo_decontam_clean_rf@sam_data@row.names
 meta <- meta %>% filter(Generation == "F1") %>% 
   mutate(Age_group = as.numeric(Age_group)) %>% 
   select(SampleID, MouseID, BirthMode, Age_group, TimePointInWeeks)
-write.table(meta %>% select(SampleID, everything()), file = "../data/07_ctf/decontam_clean_rf_pup.txt", 
+write.table(meta %>% select(SampleID, everything()), 
+            file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/07_ctf/decontam_clean_rf_pup.txt", 
             sep = "\t", quote = F, append = F, row.names = F)
 
 otu <- as(otu_table(prune_samples(meta$SampleID, phylo_decontam_clean_rf)), "matrix")
 otu <- otu[rowSums(otu) > 0,]
 otu_biom <- make_biom(data=otu)
-write_biom(otu_biom,"../data/07_ctf/decontam_clean_rf_pup_otu.biom")
+write_biom(otu_biom,"~/Dropbox/rutgers/20220722_IFNH_CSR_new/07_ctf/decontam_clean_rf_pup_otu.biom")
 ```
 
 ## run CTF in QIIME2
@@ -82,17 +83,17 @@ qza_obj <- read_qza("../data/07_ctf/weeks_results/distance_matrix.qza")
 DM_ctf <- qza_obj$data
 # read_qza doesn't support "trajectory.tsv", have to unzip it
 #qza_obj <- read_qza("../data/07_ctf/weeks_results/state_subject_ordination.qza")
-unzip("../data/07_ctf/weeks_results/state_subject_ordination.qza",
-      exdir = "../data/07_ctf/weeks_results/state_subject_ordination")
-unzip("../data/07_ctf/weeks_results/state_feature_ordination.qza",
-      exdir = "../data/07_ctf/weeks_results/state_feature_ordination")
-unzip("../data/07_ctf/weeks_results/Weeks_BirthMode_ordination.qzv",
-      exdir = "../data/07_ctf/weeks_results/Weeks_BirthMode_ordination")
+#unzip("../data/07_ctf/weeks_results/state_subject_ordination.qza",
+#      exdir = "../data/07_ctf/weeks_results/state_subject_ordination")
+#unzip("../data/07_ctf/weeks_results/state_feature_ordination.qza",
+#      exdir = "../data/07_ctf/weeks_results/state_feature_ordination")
+#unzip("../data/07_ctf/weeks_results/Weeks_BirthMode_ordination.qzv",
+#      exdir = "../data/07_ctf/weeks_results/Weeks_BirthMode_ordination")
 
-ord_birthmod <- read.table("../data/07_ctf/weeks_results/Weeks_BirthMode_ordination/38e93f60-6067-4e35-b2cf-f9bd11979756/data/data.tsv",  sep = "\t", header = F) %>% 
+ord_birthmod <- read.table("~/Dropbox/rutgers/20220722_IFNH_CSR_new/07_ctf/weeks_results/Weeks_BirthMode_ordination/38e93f60-6067-4e35-b2cf-f9bd11979756/data/data.tsv",  sep = "\t", header = F) %>% 
   transmute(SampleID = V1, PC1 = V2, PC2 = V3, PC3 = V4) %>% 
   left_join(meta_all, by = "SampleID")
-wmeta <- ord_birthmod %>% select(-c(PC1,PC2,PC3))
+wmeta <- ord_birthmod %>% dplyr::select(-c(PC1,PC2,PC3))
 
 ```
 
@@ -186,11 +187,6 @@ g <- ggplot(ord_birthmod,aes(x = Age_group, y = PC1)) +
                            title = element_text(size=12,color="black",face='bold'))
 ggsave(filename = paste0(temp_out,"BirthMode_ctf_pc1.pdf"), device = cairo_pdf, 
            plot = g, width = 7, height = 5, units = "in", dpi = 300)
-
-
-
-
-
 
 ```
 

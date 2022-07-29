@@ -140,8 +140,8 @@ cal_unifrac_dist_rarefy_bootstrap <- function(psdata, depth, n, block_size = 100
 
 ### calculate distance (only run one time)
 ```{r eval=FALSE, include=TRUE}
-load(file = "../data/BW_and_phylo.RData")
-temp_out = "../result/beta/"
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
+temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/beta/"
 psdata <- subset_samples(phylo_decontam_clean, !Sample_or_Blank)
 
 plan(multisession)  
@@ -159,21 +159,21 @@ system.time(DM_jaccard <- avgdist(ft,dmethod = "jaccard", sample = depth, iterat
 #   user  system elapsed 
 #547.209  10.310 604.054 
 
-#save(DM_uu,file = "../data/beta_DM_uu.RData")
-#save(DM_wu,file = "../data/beta_DM_wu.RData")
-#save(DM_bray,file = "../data/beta_DM_bray.RData")
-#save(DM_jaccard,file = "../data/beta_DM_jaccard.RData")
+#save(DM_uu,file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_uu.RData")
+#save(DM_wu,file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_wu.RData")
+#save(DM_bray,file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_bray.RData")
+#save(DM_jaccard,file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_jaccard.RData")
 ```
 
-## load save data
+## load data
 ```{r}
-load(file = "../data/BW_and_phylo.RData")
-load(file = "../data/beta_DM_uu.RData")
-load(file = "../data/beta_DM_wu.RData")
-load(file = "../data/beta_DM_bray.RData")
-load(file = "../data/beta_DM_jaccard.RData")
-load(file = "../data/BW_responder.RData")
-temp_out = "../result/beta/"
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_uu.RData")
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_wu.RData")
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_bray.RData")
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_jaccard.RData")
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_responder.RData")
+temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/beta/"
 ```
 
 ## over all explore

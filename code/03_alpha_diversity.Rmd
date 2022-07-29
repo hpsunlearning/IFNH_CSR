@@ -19,7 +19,7 @@ library(tidyverse)
 
 ## rarefy to the depth 
 ```{r}
-load(file = "../data/BW_and_phylo.RData")
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
 ```
 
 ### bootstrap method (only run one time)
@@ -64,7 +64,7 @@ system.time(aa <- future_map_dfr(ft_list, alpha_diversity_bootstrap,
 #   1.97    0.32  646.89
 alpha_boot <- aa %>% filter(!is.na(faith)) %>%
   dplyr::select(SampleID, Faith_PD=faith, Observed_ASVs=observed, Shannon_Index=shannon, Pielou_evenness=evenness)
-#save(alpha_boot, file = "../data/temp_alpha.RData")
+#save(alpha_boot, file = paste0(data_path, "temp_alpha.RData"))
 ```
 
 ### from rarefied feature table
@@ -78,7 +78,7 @@ alpha_rftb$Pielou_evenness <- alpha_rftb$Shannon_Index/log(alpha_rftb$Observed_A
 
 ### compare difference
 ```{r}
-load(file = "../data/temp_alpha.RData")
+load(file = paste0(data_path, "temp_alpha.RData"))
 alpha_test <- inner_join(alpha_rftb, alpha_boot, by = "SampleID")
 alpha_test %>% mutate(faith_diff = Faith_PD.x - Faith_PD.y,
                       observed_diff = Observed_ASVs.x - Observed_ASVs.y,
@@ -100,15 +100,15 @@ alpha_test %>% pivot_longer(-SampleID, names_to = c("Metrics", "Method"), names_
     facet_wrap(~ Metrics, nrow = 2, scales = "free")
 #rarefy table or bootstrap have similar results
 #use bootstrapped alpha for further study
-#save(alpha_boot, alpha_rftb, file = "../data/alpha.RData")
+#save(alpha_boot, alpha_rftb, file = paste0(data_path, "alpha.RData"))
 ```
 
 ## load data
 ```{r}
-load(file = "../data/BW_and_phylo.RData")
-load(file = "../data/alpha.RData")
-load(file = "../data/BW_responder.RData")
-temp_out = "../result/alpha/"
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/alpha.RData")
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_responder.RData")
+temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/alpha/"
 dat_alpha <- left_join(alpha_boot, meta_all, by = "SampleID")
 ```
 

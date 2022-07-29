@@ -29,8 +29,8 @@ library(tidyverse)
 
 ## load data
 ```{r}
-load(file = "../data/BW_and_phylo.RData")
-temp_out = "../result/taxa/"
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
+temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/taxa/"
 ```
 
 ## masslin2
@@ -136,7 +136,6 @@ for (tp in meta$Age_group %>% unique()){
   res <- summarise_maaslin2(path = paste0(output,tp), group = tp, taxa)
   write.csv(res, file = paste0(output, tp, "_summary.csv"),quote = F, row.names = F)  
 } 
-
 ```
 
 ## ancom
@@ -228,15 +227,8 @@ for (ll in c("ASV","Species","Genus","Family","Order","Class","Phylum")){
   }
 }
 
-#save(picked_feature, file = "../data/picked_feature.Rdata")
-load(file = "../data/picked_feature.Rdata")
-
-lapply(c("All_Age_group", "Week3", "Week6", "Week9-14", "Week18"), function(tp){
-  m_n <- length(picked_feature)
-  
-  
-  
-})
+#save(picked_feature, file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/picked_feature.Rdata")
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/picked_feature.Rdata")
 
 map_lst <-list(taxrank = c("ASV","Species","Genus","Family","Order","Class","Phylum"), 
      Age_group = c("All_Age_group", "Week3", "Week6", "Week9-14", "Week18")) %>% cross()

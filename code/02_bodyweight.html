@@ -12,7 +12,7 @@
 <meta name="author" content="Haipeng Sun" />
 
 
-<title>draft</title>
+<title>Body weight</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -362,9 +362,9 @@ pre code {
 
 
 
-<h1 class="title toc-ignore">draft</h1>
+<h1 class="title toc-ignore">Body weight</h1>
 <h4 class="author">Haipeng Sun</h4>
-<h4 class="date">1/10/2022</h4>
+<h4 class="date">7/18/2022</h4>
 
 </div>
 
@@ -388,8 +388,8 @@ library(tidyverse)</code></pre>
 </div>
 <div id="load-data" class="section level2">
 <h2>load data</h2>
-<pre class="r"><code>load(file = &quot;../data/BW_and_phylo.RData&quot;)
-temp_out = &quot;../result/bodyweight/&quot;</code></pre>
+<pre class="r"><code>load(file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData&quot;)
+temp_out = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/bodyweight/&quot;</code></pre>
 </div>
 <div id="plot-data" class="section level2">
 <h2>plot data</h2>
@@ -417,10 +417,10 @@ temp_out = &quot;../result/bodyweight/&quot;</code></pre>
                      legend.title = element_text(size=12,color=&quot;black&quot;,face=&#39;bold&#39;),
                      title = element_text(size=12,color=&quot;black&quot;,face=&#39;bold&#39;))
 ggsave(filename = paste0(temp_out,&quot;body_weight_overall.pdf&quot;), device = cairo_pdf, 
-         plot = g, width = 7, height = 5, units = &quot;in&quot;, dpi = 300)</code></pre>
+         plot = g, width = 14, height = 5, units = &quot;in&quot;, dpi = 300)</code></pre>
 </div>
-<div id="plot-bwgain" class="section level3">
-<h3>plot BWgain</h3>
+<div id="bwgain" class="section level3">
+<h3>BWgain</h3>
 <pre class="r"><code>g = ggplot(BWgain, aes(x = TimePoint_Weeks, color = BirthMode)) +
   geom_point(aes(y = BW_gain),size = 0.5, alpha = 0.7) +
   geom_path(aes(y = BW_gain, group = MouseID), size = 0.3, alpha = 0.2) +
@@ -443,7 +443,7 @@ ggsave(filename = paste0(temp_out,&quot;body_weight_overall.pdf&quot;), device =
                      legend.title = element_text(size=12,color=&quot;black&quot;,face=&#39;bold&#39;),
                      title = element_text(size=12,color=&quot;black&quot;,face=&#39;bold&#39;))
 ggsave(filename = paste0(temp_out,&quot;body_weight_gain_overall.pdf&quot;), device = cairo_pdf,
-       plot = g, width = 7, height = 5, units = &quot;in&quot;, dpi = 300)
+       plot = g, width = 14, height = 5, units = &quot;in&quot;, dpi = 300)
 
 p = ggplot(BWgain, aes(x = TimePoint_Weeks, color = BirthMode)) +
   geom_point(aes(y = BW_gain_percent), size = 0.5, alpha = 0.7) +
@@ -468,7 +468,7 @@ p = ggplot(BWgain, aes(x = TimePoint_Weeks, color = BirthMode)) +
                      legend.title = element_text(size=12,color=&quot;black&quot;,face=&#39;bold&#39;),
                      title = element_text(size=12,color=&quot;black&quot;,face=&#39;bold&#39;))
 ggsave(filename = paste0(temp_out,&quot;body_weight_gain_percent_overall.pdf&quot;), plot = p,
-    width = 7, height = 5, units = &quot;in&quot;, dpi = 300)</code></pre>
+    width = 14, height = 5, units = &quot;in&quot;, dpi = 300)</code></pre>
 </div>
 </div>
 <div id="lmm-model" class="section level2">
@@ -536,33 +536,9 @@ lmm_model_lme4 &lt;- function(x, dir, ...){
                        ylab = ylab)
 } 
 
-lmm_model_nlme &lt;- function(x, dir, ...){
-  dat &lt;- x$y
-  S &lt;- x$Sex
-  if(dat==&quot;Weight_g&quot;){
-    wdat = BW %&gt;% filter(Sex == S)
-    ylab &lt;- &quot;Body Weight (g)&quot;
-  }else{
-    wdat = BWgain %&gt;% filter(Sex == S)
-    ylab = ifelse(dat == &quot;BW_gain&quot;, &quot;Body Weight Gain (g)&quot;,&quot;Body Weight Gain (%)&quot;)
-  }
-  fo &lt;- paste0(dat, &quot; ~ TimePoint_Weeks*BirthMode&quot;) %&gt;% as.formula()
-  m &lt;- lme(fo, random = ~ 1 + TimePoint_Weeks|MouseID, 
-            data = wdat)
-  a_tab &lt;- anova(m) %&gt;%  filter(rownames(.) != &quot;(Intercept)&quot;) %&gt;% 
-      mutate(`F-value` = round(`F-value`,4),
-             `p-value` = round(`p-value`,4)) %&gt;% as.data.frame()
-  output &lt;- paste0(dir,&quot;LMM_&quot;, dat, &quot;_in_&quot;, S, &quot;_nlme.pdf&quot;)
-  plot_model_fit_table(model = m, a_tab = a_tab,
-                       terms = c(&quot;TimePoint_Weeks&quot;,&quot;BirthMode&quot;), 
-                       output = output, 
-                       xlab = &quot;Age (Week)&quot;, 
-                       ylab = ylab)
-}
 dir = paste0(temp_out,&quot;&quot;)
 model_input = list(Sex = c(&quot;M&quot;, &quot;F&quot;), y = c(&quot;Weight_g&quot;, &quot;BW_gain&quot;, &quot;BW_gain_percent&quot;)) %&gt;% cross()
-map(model_input, lmm_model_lme4, dir = dir)
-map(model_input, lmm_model_nlme, dir = dir) # Error in eval(x$call$fixed) : object &#39;fo&#39; not found </code></pre>
+map(model_input, lmm_model_lme4, dir = dir)</code></pre>
 </div>
 <div id="lmm-explore" class="section level3">
 <h3>LMM explore</h3>
@@ -1057,31 +1033,37 @@ centile_BW_m_model =  gamlss::lms(Weight_g, TimePoint_Weeks, data = BW_m, famili
          Overweight = ifelse(BW_status == &quot;Overweight&quot;, &quot;Y&quot;, &quot;N&quot;),
          Underweight = ifelse(BW_status == &quot;Underweight&quot;, &quot;Y&quot;, &quot;N&quot;)
          )
-
 save(BW_f_centile, BW_m_centile, at_week15,
-     file = paste0(&quot;../data/BW_responder.RData&quot;))</code></pre>
+     file = paste0(data_path,&quot;BW_responder.RData&quot;))</code></pre>
 </div>
 <div id="plot" class="section level3">
 <h3>plot</h3>
-<pre class="r"><code>dat &lt;- BW %&gt;% left_join(at_week15 %&gt;% select(MouseID, BW_status, Overweight, Underweight), 
+<pre class="r"><code>dat &lt;- BW %&gt;% left_join(at_week15 %&gt;% 
+                          dplyr::select(MouseID, BW_status, Overweight, Underweight), 
                         by = &quot;MouseID&quot;) %&gt;% 
   filter(!is.na(BW_status)) 
 
-dat_centile &lt;- rbind(BW_f_centile %&gt;% transmute(TimePoint_Weeks = x, Sex = &quot;F&quot;, BW20 = `20`, BW50 = `50`, BW80 = `80`),
-                     BW_m_centile %&gt;% transmute(TimePoint_Weeks = x, Sex = &quot;M&quot;, BW20 = `20`, BW50 = `50`, BW80 = `80`))
+dat_centile &lt;- rbind(BW_f_centile %&gt;% transmute(TimePoint_Weeks = x, 
+                                                Sex = &quot;F&quot;, BW20 = `20`, BW50 = `50`, BW80 = `80`),
+                     BW_m_centile %&gt;% transmute(TimePoint_Weeks = x, 
+                                                Sex = &quot;M&quot;, BW20 = `20`, BW50 = `50`, BW80 = `80`))
 
 g = ggplot(dat, aes(x = TimePoint_Weeks)) +
   geom_point(data = dat %&gt;% filter(Overweight == &quot;N&quot;), 
-             aes(x = TimePoint_Weeks, y = Weight_g), color = &quot;Gray50&quot;, size = 0.5, alpha = 0.5) +
+             aes(x = TimePoint_Weeks, y = Weight_g), 
+             color = &quot;Gray50&quot;, size = 0.5, alpha = 0.5) +
   geom_path(data = dat %&gt;% filter(Overweight == &quot;N&quot;),
-             aes(x = TimePoint_Weeks, y = Weight_g , group = MouseID), color = &quot;Gray50&quot;, size = 0.3, alpha = 0.5) + 
+             aes(x = TimePoint_Weeks, y = Weight_g , group = MouseID), 
+            color = &quot;Gray50&quot;, size = 0.3, alpha = 0.5) + 
   geom_ribbon(data = dat_centile, alpha = 0.3, size = 0.1,
               aes(x = TimePoint_Weeks, ymin = BW20, ymax = BW80)) + 
   geom_path(data = dat_centile, aes(x = TimePoint_Weeks, y = BW50)) + 
   geom_point(data = dat %&gt;% filter(Overweight == &quot;Y&quot;),
-             aes(x = TimePoint_Weeks, y = Weight_g, color = BirthMode), size = 1, alpha = 1) +
+             aes(x = TimePoint_Weeks, y = Weight_g, color = BirthMode), 
+             size = 1, alpha = 1) +
   geom_path(data = dat %&gt;% filter(Overweight == &quot;Y&quot;),
-             aes(x = TimePoint_Weeks, y = Weight_g , group = MouseID, color = BirthMode ), size = 0.5, alpha = 1) +   
+            aes(x = TimePoint_Weeks, y = Weight_g, group = MouseID, color = BirthMode ), 
+            size = 0.5, alpha = 1) +   
   facet_grid(.~Sex, labeller = labeller(Sex = Sex_labs)) +
   scale_x_continuous(breaks = c(2,4,6,8,10,12,14,16,18)) + 
   scale_color_manual(values = BirthMode_color, aesthetics = c(&quot;fill&quot;, &quot;colour&quot;)) +

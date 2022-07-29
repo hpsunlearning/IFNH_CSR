@@ -19,7 +19,8 @@ library(tidyverse)
 ```{r}
 # set path
 path_rec <- "~/Dropbox/IFNH CSR/ExperimentRecords/"
-temp_out <- "../result/"
+data_path <- "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/"
+temp_out <- "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/"
 metafile <- "MasterMetadata-CS-SW-20220623-hs.xlsx"
 # set colors, labs and so on
 BirthMode_color <- c("VF"="#377EB8", "CSR"="#4DAF4A", "CS"="#E41A1C")
@@ -102,10 +103,10 @@ rm(FR, a, aa)
 ## Fecal 16S
 ### import into phyloseq
 ```{r}
-phylo_all <- qza_to_phyloseq(features = "../data/04_dada/table_csr.qza",
-                         taxonomy = "../data/05_taxa/taxonomy_all_silva138.qza",
-                         tree =  "../data/04_dada/rooted_tree_all.qza",
-                         metadata = "../data/meta_csr.txt")
+phylo_all <- qza_to_phyloseq(features = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/04_dada/table_csr.qza",
+                         taxonomy = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/05_taxa/taxonomy_all_silva138.qza",
+                         tree =  "~/Dropbox/rutgers/20220722_IFNH_CSR_new/04_dada/rooted_tree_all.qza",
+                         metadata = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/meta_csr.txt")
 ```
 
 ### metadata
@@ -211,6 +212,8 @@ coverage_stat %>%ggplot(aes(x=n_seqs, y=goods)) +
   geom_point() + 
   geom_hline(yintercept = 99, color = "red") + 
   labs(x = "Depth", y = "Goods coverage", title = "Goods coverage")
+
+rarecurve_data = rarecurve(ft, step = 50, tidy = T)
 ```
 
 ### set depth to 2992
@@ -226,7 +229,7 @@ coverage_stat %>%ggplot(aes(x=n_seqs, y=goods)) +
   geom_vline(xintercept = depth, color = "black") + 
   labs(x = "Depth", y = "Goods coverage", title = "Goods coverage")
 
-rarecurve_data = rarecurve(ft, step = 50, tidy = T)
+
 rarecurve_data %>% ggplot(aes(x=Sample, y=Species, group=Site)) + 
   geom_line(alpha = 0.3) + 
   geom_vline(xintercept = depth, color = "black") + 
@@ -243,13 +246,15 @@ phylo_decontam_clean_rf = rarefy_even_depth(phylo_decontam_clean,
                                       sample.size = depth, 
                                       rngseed = 3, 
                                       replace = F)
-rm(ft, coverage_stat, rarecurve_data)
+rm(ft, coverage_stat)
 ```
 
 ## save data
 ```{r eval=FALSE, include=TRUE}
 #save.image(file = "../data/BW_and_phylo.RData")
 #load(file = "../data/BW_and_phylo.RData")
+#save.image(file = paste0(data_path,"BW_and_phylo.RData"))
+#load(file = paste0(data_path,"BW_and_phylo.RData"))
 ```
 
 

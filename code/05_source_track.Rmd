@@ -20,10 +20,11 @@ library(tidyverse)
 ```
 
 
-## load save data
+## load data
 ```{r}
-load(file = "../data/BW_and_phylo.RData")
-temp_out = "../result/sourcetrack/"
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
+#load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_responder.RData")
+temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/sourcetrack/"
 ```
 
 ## Source track FEAST

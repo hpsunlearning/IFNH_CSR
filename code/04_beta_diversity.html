@@ -502,8 +502,8 @@ cal_unifrac_dist_rarefy_bootstrap &lt;- function(psdata, depth, n, block_size = 
 </div>
 <div id="calculate-distance-only-run-one-time" class="section level3">
 <h3>calculate distance (only run one time)</h3>
-<pre class="r"><code>load(file = &quot;../data/BW_and_phylo.RData&quot;)
-temp_out = &quot;../result/beta/&quot;
+<pre class="r"><code>load(file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData&quot;)
+temp_out = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/beta/&quot;
 psdata &lt;- subset_samples(phylo_decontam_clean, !Sample_or_Blank)
 
 plan(multisession)  
@@ -521,21 +521,21 @@ system.time(DM_jaccard &lt;- avgdist(ft,dmethod = &quot;jaccard&quot;, sample = 
 #   user  system elapsed 
 #547.209  10.310 604.054 
 
-#save(DM_uu,file = &quot;../data/beta_DM_uu.RData&quot;)
-#save(DM_wu,file = &quot;../data/beta_DM_wu.RData&quot;)
-#save(DM_bray,file = &quot;../data/beta_DM_bray.RData&quot;)
-#save(DM_jaccard,file = &quot;../data/beta_DM_jaccard.RData&quot;)</code></pre>
+#save(DM_uu,file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_uu.RData&quot;)
+#save(DM_wu,file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_wu.RData&quot;)
+#save(DM_bray,file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_bray.RData&quot;)
+#save(DM_jaccard,file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_jaccard.RData&quot;)</code></pre>
 </div>
 </div>
 <div id="load-save-data" class="section level2">
 <h2>load save data</h2>
-<pre class="r"><code>load(file = &quot;../data/BW_and_phylo.RData&quot;)
-load(file = &quot;../data/beta_DM_uu.RData&quot;)
-load(file = &quot;../data/beta_DM_wu.RData&quot;)
-load(file = &quot;../data/beta_DM_bray.RData&quot;)
-load(file = &quot;../data/beta_DM_jaccard.RData&quot;)
-load(file = &quot;../data/BW_responder.RData&quot;)
-temp_out = &quot;../result/beta/&quot;</code></pre>
+<pre class="r"><code>load(file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData&quot;)
+load(file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_uu.RData&quot;)
+load(file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_wu.RData&quot;)
+load(file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_bray.RData&quot;)
+load(file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/beta_DM_jaccard.RData&quot;)
+load(file = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_responder.RData&quot;)
+temp_out = &quot;~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/beta/&quot;</code></pre>
 </div>
 <div id="over-all-explore" class="section level2">
 <h2>over all explore</h2>
