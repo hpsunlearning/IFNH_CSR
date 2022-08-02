@@ -153,6 +153,64 @@ ggsave(filename = paste0(temp_out,"vaginal_fecal_by_Age_group.pdf"), device = ca
          plot = g, width = 7, height = 5, units = "in", dpi = 300)
 ```
 
+## alpha vs DNAconc
+```{r}
+dat <- dat_alpha %>% filter(!is.na(DNA_Conc)) %>% 
+  dplyr::select(SampleID, DNA_Conc, Faith_PD:Pielou_evenness) %>% 
+  pivot_longer(Faith_PD:Pielou_evenness, names_to = "Metrics", values_to = "value")
+
+g <- ggplot(dat, aes(DNA_Conc,value)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  stat_regline_equation(label.x.npc = 0.2,label.y.npc = 0.2) + 
+  stat_cor(label.x.npc = 0.2, label.y.npc = 0.01) + 
+  scale_x_log10() + 
+  scale_y_log10() +  
+  labs(x=expression("DNA concentration (ng/"*mu*"L)"), y="", title = "") + 
+  facet_wrap(~Metrics, nrow = 2, scales = "free") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold'))  
+ggsave(filename = paste0(temp_out, "alpha_by_DNAconc.pdf"), device = cairo_pdf, 
+         plot = g, width = 9, height = 7, units = "in", dpi = 300) 
+
+dat <- dat_alpha %>% filter(!is.na(PCR_Conc)) %>% 
+  dplyr::select(SampleID, PCR_Conc, Faith_PD:Pielou_evenness) %>% 
+  pivot_longer(Faith_PD:Pielou_evenness, names_to = "Metrics", values_to = "value")
+
+g <- ggplot(dat, aes(PCR_Conc,value)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  stat_regline_equation(label.x.npc = 0.2,label.y.npc = 0.2) + 
+  stat_cor(label.x.npc = 0.2, label.y.npc = 0.01) + 
+  scale_x_log10() + 
+  scale_y_log10() +  
+  labs(x=expression("PCR concentration (ng/"*mu*"L)"), y="", title = "") + 
+  facet_wrap(~Metrics, nrow = 2, scales = "free") +
+  theme_bw() + theme(#aspect.ratio = 0.8,
+                     legend.position="none",
+                     panel.background = element_rect(fill = NA),
+                     strip.text = element_text(size=12,color="black",face='bold'),
+                     axis.title = element_text(size=12,color="black",face='bold'),
+                     axis.text = element_text(size=12,color="black",face='bold'),
+                     axis.text.x = element_text(size=12,color="black",face='bold',angle=0),
+                     axis.text.y = element_text(size=12,color="black",face='bold'),
+                     legend.text = element_text(size=12,color="black",face='bold'),
+                     legend.title = element_text(size=12,color="black",face='bold'),
+                     title = element_text(size=12,color="black",face='bold')) 
+ggsave(filename = paste0(temp_out, "alpha_by_PCRconc.pdf"), device = cairo_pdf, 
+         plot = g, width = 9, height = 7, units = "in", dpi = 300) 
+
+```
+
 ## effect of birthmode on pups
 ### linear model
 ```{r}
