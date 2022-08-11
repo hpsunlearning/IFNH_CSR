@@ -622,6 +622,70 @@ for(dd in c("uu","wu","bray","jaccard")){
 }
 ```
 
+## RDA with age sex birthmode
+```{r}
+for(dd in c("uu","wu","bray","jaccard")){
+  wdist <- get(paste0("DM_",dd))
+  wmeta <- meta_all %>% filter(SampleID %in% labels(wdist)) %>% 
+    filter(Generation == "F1")
+  wdist <- dist_subset(wdist, wmeta$SampleID)
+
+  wrda <- dbrda(wdist ~ BirthMode + Sex, data = wmeta)
+  wrda_eig <- eigenvals(wrda)
+  varRDA1 <- round(wrda_eig["dbRDA1"]/sum(wrda_eig)*100,2)
+  varRDA2 <- round(wrda_eig["dbRDA2"]/sum(wrda_eig)*100,2)
+  wrda_score <- scores(wrda)
+  wdat_rda <- merge(wrda_score$sites,
+                    wmeta, by.x = 0, by.y = "SampleID", all.x = T)
+  wdat_center_BirthMode <- wrda_score$centroids %>% as.data.frame() %>% 
+    rownames_to_column(var = "rowname") %>%
+    filter(str_detect(rowname, "^Birth")) %>% 
+    transmute(BirthMode = str_remove(rowname, "BirthMode"), 
+                dbRDA1.birth = dbRDA1, dbRDA2.birth = dbRDA2) 
+  wdat_center_Sex <- wrda_score$centroids %>% as.data.frame() %>% 
+    rownames_to_column(var = "rowname") %>%
+    filter(str_detect(rowname, "^Sex")) %>% 
+    transmute(Sex = str_remove(rowname, "Sex"), 
+                dbRDA1.sex = dbRDA1, dbRDA2.sex = dbRDA2) 
+#  wdat_center_Age_group <- wrda_score$centroids %>% as.data.frame() %>% 
+#    rownames_to_column(var = "rowname") %>%
+#    filter(str_detect(rowname, "^Age_group")) %>% 
+#    transmute(Age_group = str_remove(rowname, "Age_group"), 
+#                dbRDA1.age = dbRDA1, dbRDA2.age = dbRDA2)     
+  wdat <- wdat_rda %>% 
+    left_join(wdat_center_Sex, by = "Sex") %>%
+    left_join(wdat_center_BirthMode, by = "BirthMode")
+#    left_join(wdat_center_Age_group, by = "Age_group")
+
+  x_lab <- paste0("dbRDA1 (", varRDA1, "%)")
+  y_lab <- paste0("dbRDA2 (", varRDA2, "%)")
+  
+  g <- ggplot(wdat, aes(x = dbRDA1, y = dbRDA2, color = BirthMode)) + 
+    geom_point(size = 2) + 
+    #geom_segment(aes(x = dbRDA1, y = dbRDA2, xend = dbRDA1.birth, yend = dbRDA2.birth),size = 0.2, alpha = 0.5) + 
+    #geom_point(data = wdat_center_BirthMode, aes(x = dbRDA1.birth, y = dbRDA2.birth)) + 
+    stat_ellipse(type = "t") + 
+    scale_color_manual(values = BirthMode_color) + 
+    labs(x = x_lab, y = y_lab, title = "") + 
+    facet_wrap(~ Age_group, nrow = 2) +
+    theme_bw() + theme(aspect.ratio = 1,
+                           panel.background = element_rect(fill = NA),
+                           strip.text = element_text(size=12,color="black",face='bold'),
+                           axis.title = element_text(size=12,color="black",face='bold'),
+                           axis.text = element_text(size=12,color="black",face='bold'),
+                           axis.text.x = element_text(size=12,color="black",face='bold'),
+                           axis.text.y = element_text(size=12,color="black",face='bold'),
+                           legend.text = element_text(size=12,color="black",face='bold'),
+                           legend.title = element_text(size=12,color="black",face='bold'),
+                           title = element_text(size=12,color="black",face='bold'))  
+  ggsave(filename = paste0(temp_out,"dbRDA_",dd,"_","pup_by_birthmode_Age_group.pdf"), device = cairo_pdf, 
+           plot = g, width = 7, height = 5, units = "in", dpi = 300)   
+}  
+```
+
+
+
+
 ## overweight
 ```{r}
 wmeta <- meta_all %>% left_join(at_week15 %>% dplyr::select(MouseID, BW_status, Overweight, Underweight), 
