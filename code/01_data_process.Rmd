@@ -30,6 +30,7 @@ metafile = "MasterMetadata-CS-SW-20220623-hs.xlsx"
 # set colors, labs and so on
 BirthMode_color = c("VF"="#377EB8", "CSR"="#4DAF4A", "CS"="#E41A1C")
 Sex_labs = c("F" = "Female", "M" = "Male")
+Sex_color = c("F" = "#e9a3c9", "M" = "#a1d76a")
 responder_color = c("Responder"="#d95f0e", "Nonresponder"="gray50")
 BW_status_color = c("Overweight"="#7570b3", "Normal"="#b3cde3","Underweight"="#66a61e")
 ```
@@ -439,7 +440,7 @@ save(phylo_all, phylo_decontam, phylo_decontam_clean, phylo_decomtan_rf,
      taxa, depth, contamdf, rarecurve_data, coverage_stat, meta_all,
      file = paste0(path_rec,"data/16S_data.Rdata"))
 save(path_rec,  temp_out, metafile,
-     BirthMode_color, BW_status_color, responder_color, Sex_labs,
+     BirthMode_color, BW_status_color, responder_color, Sex_labs, Sex_color,
      BW, BW_sum, BWgain, BWgain_sum,meta_all,
      file = paste0(path_rec,"data/general_data.Rdata"))
 ```
