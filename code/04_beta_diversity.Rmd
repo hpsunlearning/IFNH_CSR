@@ -314,6 +314,7 @@ for(dd in c("uu","wu","bray","jaccard")){
       stat_compare_means(aes(group = BirthMode), hide.ns = T, label =  "p.signif") +
       scale_color_manual(values = BirthMode_color, aesthetics = c("color","fill")) + 
       labs(x="",y=x_lab) + 
+      facet_wrap(~ Sex, ncol = 2, scales = "fixed", labeller = labeller(Sex = Sex_labs)) +
       coord_flip() +
       theme_bw() + theme(aspect.ratio = 1,
                          panel.background = element_rect(fill = NA),
@@ -328,7 +329,7 @@ for(dd in c("uu","wu","bray","jaccard")){
   }
   g <- plot_Age_group_pc1(wdat_rda, x_lab)
   ggsave(filename = paste0(temp_out,"beta/pup_by_TimePoint_", dd, "_pc1.pdf"), device = cairo_pdf, 
-         plot = g, width = 7, height = 5, units = "in", dpi = 300)
+         plot = g, width = 10, height = 5, units = "in", dpi = 300)
   #PC2 by TimePoint Birthmode
   plot_Age_group_pc2 <- function(wdat, y_lab){
     g <- ggplot(wdat, aes(x = TimePoint, y = PC2)) + 
@@ -337,6 +338,7 @@ for(dd in c("uu","wu","bray","jaccard")){
       stat_compare_means(aes(group = BirthMode), hide.ns = T, label =  "p.signif") +
       scale_color_manual(values = BirthMode_color, aesthetics = c("color","fill")) + 
       labs(x="",y=y_lab) + 
+      facet_wrap(~ Sex, ncol = 2, scales = "fixed", labeller = labeller(Sex = Sex_labs)) +
       theme_bw() + theme(aspect.ratio = 1,
                          panel.background = element_rect(fill = NA),
                          strip.text = element_text(size=12,color="black",face='bold'),
@@ -350,7 +352,7 @@ for(dd in c("uu","wu","bray","jaccard")){
   }
   g <- plot_Age_group_pc2(wdat_rda, y_lab)
   ggsave(filename = paste0(temp_out,"beta/pup_by_TimePoint_", dd, "_pc2.pdf"), device = cairo_pdf, 
-         plot = g, width = 7, height = 5, units = "in", dpi = 300)  
+         plot = g, width = 10, height = 5, units = "in", dpi = 300)  
   ##Poca birthmode by TimePoint
   plot_birthmode_pcoa_Age_group <- function(wdat, x_lab, y_lab){
     wdat_c <- wdat %>% group_by(BirthMode, TimePoint, Sex) %>% summarise(across(starts_with("PC"), mean)) %>% 
@@ -489,53 +491,131 @@ for(dd in c("uu","wu","bray","jaccard")){
 ## overweight
 ```{r}
 wmeta <- meta_all %>% left_join(at_week15 %>% dplyr::select(MouseID, BW_status, Overweight, Underweight), 
-                        by = "MouseID") %>% filter(!is.na(BW_status))
+                                by = "MouseID") %>% filter(!is.na(BW_status))
+
+disper_l <- list()
+adoins_l <- list()
 
 for(dd in c("uu","wu","bray","jaccard")){
   wdist <- get(paste0("DM_",dd))
   wmeta <- wmeta %>% filter(SampleID %in% labels(wdist)) 
   wdist <- dist_subset(wdist, wmeta$SampleID)
-  ##
+  
   disper <- betadisper(wdist, wmeta$Overweight)
-  d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+  disper_l[dd] <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
     rownames_to_column(var = "Variable")
-  write.csv(d1, file = paste0(temp_out,dd,"_","Overweight_dispersion_test.csv"), 
+  
+  per <- adonis2(wdist ~ Overweight+BirthMode+TimePoint+Sex, data = wmeta, by = "margin")
+  adoins_l[dd] = calcOmega2_dm(per)
+  
+  ## by TimePoint and Sex
+  lst_df <- expand.grid(wmeta$Sex %>% unique(), 
+                        wmeta$TimePoint %>% unique(), 
+                        stringsAsFactors = F)
+  names(lst_df) <- c("Sex", "TimePoint")
+  res_sum <- lapply(1:nrow(lst_df), function(i){
+    wmeta_s <- wmeta %>% filter(Sex == lst_df[i,"Sex"], TimePoint == lst_df[i,"TimePoint"])
+    wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
+    disper <- betadisper(wdist_s, wmeta_s$Overweight)   
+    d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+      rownames_to_column(var = "Comp")
+    d1 <- d1 %>% mutate(Sex = lst_df[i,"Sex"], TimePoint = lst_df[i,"TimePoint"], Variable = "Overweight")
+    
+    res <- calcOmega2_dm(adonis2(wdist_s ~ Overweight, data = wmeta_s, by = "terms")) %>% 
+      as.data.frame() %>% mutate(Comp = "Overweight") %>% 
+      mutate(Sex = lst_df[i,"Sex"], TimePoint = lst_df[i,"TimePoint"], fo = "~ Overweight")    
+    list(dispersion = d1, permanova = res)
+  })
+  res_dispersion_1 <- lapply(1:length(res_sum),function(i){res_sum[[i]]$dispersion}) %>% do.call(rbind,.)
+  res_permanova_1 <- lapply(1:length(res_sum),function(i){res_sum[[i]]$permanova}) %>% do.call(rbind,.)
+  ## by TimePoint
+  res_sum <- lapply(wmeta$TimePoint %>% unique(), function(tp){
+    wmeta_s <- wmeta %>% filter(TimePoint == tp)
+    wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
+    disper <- betadisper(wdist_s, wmeta_s$Overweight)   
+    d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+      rownames_to_column(var = "Comp")
+    d1 <- d1 %>% mutate(Sex = "Both", TimePoint = tp, Variable = "Overweight")
+    
+    res <- calcOmega2_dm(adonis2(wdist_s ~ Overweight+Sex, data = wmeta_s, by = "terms")) %>% 
+      as.data.frame() %>% mutate(Comp = "Overweight") %>% 
+      mutate(Sex = "Both", TimePoint = tp, fo = "~ Overweight+Sex")    
+    list(dispersion = d1, permanova = res)
+  })
+  res_dispersion_2 <- lapply(1:length(res_sum),function(i){res_sum[[i]]$dispersion}) %>% do.call(rbind,.)
+  res_permanova_2 <- lapply(1:length(res_sum),function(i){res_sum[[i]]$permanova}) %>% do.call(rbind,.)
+  ## 
+  disper <- betadisper(wdist, wmeta$Overweight)   
+  d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+    rownames_to_column(var = "Comp")
+  d1 <- d1 %>% mutate(Sex = "Both", TimePoint = "All", Variable = "Overweight")
+  disper <- betadisper(wdist, wmeta$Sex)
+  d2 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+    rownames_to_column(var = "Comp")
+  d2 <- d2 %>% mutate(Sex = "Both", TimePoint = "All", Variable = "Sex")
+  disper <- betadisper(wdist, wmeta$TimePoint)
+  d3 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+    rownames_to_column(var = "Comp")
+  d3 <- d3 %>% mutate(Sex = "Both", TimePoint = "All", Variable = "TimePoint")
+  res_dispersion_3 <- rbind(d1, d2, d3)
+  
+  res_permanova_3 <- calcOmega2_dm(adonis2(wdist ~ Overweight+BirthMode+TimePoint+Sex, data = wmeta, by = "terms")) %>% 
+    as.data.frame() %>% mutate(Comp = "All") %>% filter(!is.na(F)) %>% 
+    mutate(Sex = "Both", TimePoint = "All", fo = "~ BirthMode + Sex + TimePoint") 
+  
+  res <- rbind(res_permanova_1, res_permanova_2, res_permanova_3)
+  res$padj <- p.adjust(res$`Pr(>F)`, method = "fdr") 
+  write.csv(res %>% filter(!is.na(`F`)),
+            file = paste0(temp_out, "beta/adonis_Overweight_",dd, "_table.csv"),
             quote = F, row.names = F)
-  ##
-  per <- adonis2(wdist ~ Overweight+BirthMode+Age_group+Sex, data = wmeta, by = "margin")
-  res = calcOmega2_dm(per)
-  write.csv(res, file = paste0(temp_out,dd,"_","Overweight_adonis_test.csv"))
+  write.csv(rbind(res_dispersion_1, res_dispersion_2, res_dispersion_3),
+            file = paste0(temp_out, "beta/dispersion_Overweight_",dd, "_table.csv"),
+            quote = F, row.names = F)
+}
+
+for(dd in c("uu","wu","bray","jaccard")){
+  wdist <- get(paste0("DM_",dd))
+  wmeta <- wmeta %>% filter(SampleID %in% labels(wdist)) 
+  wdist <- dist_subset(wdist, wmeta$SampleID)
   ## pcoa
   wrda <- dbrda(wdist ~ 1)
   wrda_eig <- eigenvals(wrda)
   varPC1 <- round(wrda_eig[1]/sum(wrda_eig)*100,2)
   varPC2 <- round(wrda_eig[2]/sum(wrda_eig)*100,2)
-  wrda_fit <- envfit(wrda ~ Overweight + BirthMode + Sex + Age_group, data = wmeta)
+  wrda_fit <- envfit(wrda ~ Overweight + BirthMode + Sex + TimePoint, data = wmeta)
   wdat_rda <- merge(wrda$CA$u[,1:2], wmeta, by.x = 0, by.y = "SampleID", all.x = T) %>% 
     rename(PC1 = MDS1, PC2 = MDS2)
   x_lab <- paste0("PC1 (", varPC1, "%)")
   y_lab <- paste0("PC2 (", varPC2, "%)")
   
-  g <- ggplot(wdat_rda, aes(x = PC1, y = PC2, color = Overweight)) + 
-      geom_point( size = 2) + 
-      stat_ellipse(type = "t") + 
-      scale_color_manual(values = c("Y"="#d73027", "N"="#1a9850"), 
-                         name = "Overweight") + 
-      labs(x = x_lab, y = y_lab, title = "") + 
-      facet_wrap(~Age_group, nrow = 2) + 
-      theme_bw() + theme(aspect.ratio = 1,
-                           panel.background = element_rect(fill = NA),
-                           strip.text = element_text(size=12,color="black",face='bold'),
-                           axis.title = element_text(size=12,color="black",face='bold'),
-                           axis.text = element_text(size=12,color="black",face='bold'),
-                           axis.text.x = element_text(size=12,color="black",face='bold'),
-                           axis.text.y = element_text(size=12,color="black",face='bold'),
-                           legend.text = element_text(size=12,color="black",face='bold'),
-                           legend.title = element_text(size=12,color="black",face='bold'),
-                           title = element_text(size=12,color="black",face='bold'))
-  ggsave(filename = paste0(temp_out,dd,"_","pup_Overweight_by_Age_group_pcoa.pdf"), device = cairo_pdf, 
-           plot = g, width = 7, height = 5, units = "in", dpi = 300)
+  wdat_c <- wdat_rda %>% group_by(TimePoint, Sex, Overweight) %>% summarise(across(starts_with("PC"), mean)) %>% 
+    ungroup()
+  wdat_2 <- merge(wdat_rda, wdat_c, by = c("TimePoint", "Sex", "Overweight"), suffixes = c("",".c"))
+  
+  g <- ggplot(wdat_2, aes(x = PC1, y = PC2, color = Overweight)) + 
+    geom_point(size = 1, alpha = 0.7) + 
+    geom_segment(aes(x = PC1, xend = PC1.c, y = PC2, yend = PC2.c), size = 0.3) + 
+    geom_point(data = wdat_c, size = 5, alpha = 0.7, aes(fill = Overweight)) + 
+    stat_ellipse(type = "t") + 
+    scale_color_manual(values = c("Y"="#d73027", "N"="#1a9850"), 
+                       name = "Overweight") + 
+    labs(x = x_lab, y = y_lab, title = "") + 
+    facet_grid(TimePoint~Sex,
+               labeller = labeller(Sex = Sex_labs)) + 
+    theme_bw() + theme(aspect.ratio = 1,
+                       panel.background = element_rect(fill = NA),
+                       strip.text = element_text(size=12,color="black",face='bold'),
+                       axis.title = element_text(size=12,color="black",face='bold'),
+                       axis.text = element_text(size=12,color="black",face='bold'),
+                       axis.text.x = element_text(size=12,color="black",face='bold'),
+                       axis.text.y = element_text(size=12,color="black",face='bold'),
+                       legend.text = element_text(size=12,color="black",face='bold'),
+                       legend.title = element_text(size=12,color="black",face='bold'),
+                       title = element_text(size=12,color="black",face='bold'))
+  ggsave(filename = paste0(temp_out,"beta/pup_Overweight_by_TimePoint_", dd, "_pcoa.pdf"), device = cairo_pdf, 
+         plot = g, width = 7, height = 10, units = "in", dpi = 300)
 }
+
 
 ```
 
