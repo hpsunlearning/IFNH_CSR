@@ -128,16 +128,34 @@ Mapping_file = paste0(path_rec,"data/ExperimentRecords/Result_from_Troy/Behavior
 dat <- lapply(excel_sheets(CLAMS_file),function(tt){
   a <- read_excel(CLAMS_file, sheet = tt, range = "A3:Y42", col_names = F)
   names(a) <- c("MouseID", c(0:23))
+  a <- a %>% mutate(MouseID = str_to_upper(MouseID)) %>% 
+    mutate(MouseID = ifelse(MouseID == "FO59.P8", "F059.P8", MouseID))
   aa <- a %>% pivot_longer(cols = -MouseID, values_to = "Value", names_to = "Time") %>% 
     filter(!is.na(Value)) %>% 
     mutate(Test = tt)
   aa
-}) %>% do.call(rbind,.)
+}) %>% do.call(rbind,.) 
 
-map <- read_excel(Mapping_file)
-dat <- dat %>% left_join(map, by = "MouseID") %>% 
+map <- read_excel(Mapping_file) 
+dat <- dat %>% 
+  left_join(map, by = "MouseID") %>% 
   mutate(Time = as.integer(Time)) %>% 
   mutate(Day_or_Night = ifelse(Time>6&Time<19, "Day","Night"))
+
+df_sum <-  dat %>% group_by(Time, Test, BirthMode) %>% 
+  summarise(Value_mean = mean(Value), Value_sd = sd(Value), N = n()) %>% ungroup() %>% 
+  mutate(Value_se = Value_sd / sqrt(N))
+  
+norm_test <- dat %>% group_by(Time, Test) %>% 
+  shapiro_test(Value)
+
+# norm_test %>% mutate(P2 = round(p, digits = 3)) %>% mutate(sig = ifelse(P2>0.05, "n","y")) %>% count(Test, sig) %>% pivot_wider(Test, names_from = sig, values_from = n)
+
+stat.test1 <- dat %>% group_by(Time, Test, Sex) %>% 
+  t_test(Value ~ BirthMode) %>% 
+  adjust_pvalue(method = "BH") %>% 
+  add_significance("p") %>% 
+  add_xy_position(x = "BirthMode", scales = "free", fun = "mean_sd")
 
 
 
@@ -145,5 +163,17 @@ dat <- dat %>% left_join(map, by = "MouseID") %>%
 ```
 
 ### plot
+
+
+
+
+
+
+
+
+
+
+
+
 
 
