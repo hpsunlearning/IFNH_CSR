@@ -163,6 +163,28 @@ stat.test1 <- dat %>% group_by(Time, Test, Sex) %>%
 ```
 
 ### plot
+#### hourly
+```{r}
+wdat <- dat %>% filter(Test == "V.O2")
+wdat_sum <- wdat %>% group_by(Sex, Time, BirthMode) %>% 
+  summarise(Value_mean = mean(Value), Value_sd = sd(Value), N = n()) %>% 
+  ungroup() %>% 
+  mutate(Value_se = Value_sd/sqrt(N))
+wstat <- stat.test1 %>% filter(Test == "V.O2")
+
+y_max <- (max(wdat_sum$Value_mean) + max(wdat_sum$Value_sd))*1.1
+y_min <- 0 - 0.05*y_max
+
+g <- ggplot(wdat_sum, aes(Time, Value_mean, color = BirthMode)) +
+  geom_path(aes(group = BirthMode)) + 
+  geom_point() + 
+  geom_linerange(aes(ymin = Value_mean - Value_se, ymax = Value_mean + Value_se)) + 
+  stat_pvalue_manual()
+  scale_y_continuous(limits = c(y_min, y_max)) + 
+  facet_grid(Sex~.)
+
+
+```
 
 
 
