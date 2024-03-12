@@ -19,6 +19,7 @@ library(rlist)
 library(ggpubr)
 library(readxl)
 library(rstatix)
+library(ggpattern)
 library(patchwork)
 library(tidyverse)
 ```
@@ -73,7 +74,7 @@ temp_out = paste0(path_rec,"output/fat/")
 
 g <- ggplot(df2, aes(Gene, FC, color = BirthMode)) + 
   geom_point(position = position_dodge(width = 0.9)) + 
-  geom_col(data = df_sum, aes(Gene, FC, color = BirthMode, fill = BirthMode),
+  geom_col(data = df_sum, aes(Gene, FC_mean, color = BirthMode, fill = BirthMode),
            position = position_dodge(), alpha = 0.5) +
   facet_grid(Tissue ~ ., scales = "free_y")
 
@@ -87,10 +88,11 @@ for (ff in c("BAT","iWAT")){
     g_list[[ff]][[gene]]  <- ggplot(wdat, aes(BirthMode, FC, color = BirthMode)) + 
       geom_point() + 
       geom_col(data = wdat_sum, aes(BirthMode, FC_mean, fill = BirthMode), 
-               alpha = 0.5, width = 0.3) + 
+               alpha = 0.7, width = 0.3) + 
       geom_errorbar(data = wdat_sum, aes(BirthMode, FC_mean, ymin = FC_mean - FC_se, ymax = FC_mean + FC_se),
                     width = 0.1) +
       stat_pvalue_manual(wstat.test, label = "p.adj.signif", tip.length = 0, hide.ns = T, size = 12/.pt) + 
+      scale_color_manual(values = BirthMode_color) +
       scale_y_continuous(expand = c(0, 0), limits = c(0, max(wdat$FC)*1.05)) +
       labs(x = "", y = "Relative expression\n(Normalized to 18S RNA)", title = gene) + 
       theme_classic() + theme(aspect.ratio = 1,
@@ -137,19 +139,22 @@ dat <- lapply(excel_sheets(CLAMS_file),function(tt){
 }) %>% do.call(rbind,.) 
 
 map <- read_excel(Mapping_file) 
+
 dat <- dat %>% 
   left_join(map, by = "MouseID") %>% 
   mutate(Time = as.integer(Time)) %>% 
   mutate(Day_or_Night = ifelse(Time>6&Time<19, "Day","Night"))
 
-df_sum <-  dat %>% group_by(Time, Test, BirthMode) %>% 
+#hourly
+dat_sum <-  dat %>% group_by(Time, Test, BirthMode, Sex) %>% 
   summarise(Value_mean = mean(Value), Value_sd = sd(Value), N = n()) %>% ungroup() %>% 
   mutate(Value_se = Value_sd / sqrt(N))
   
 norm_test <- dat %>% group_by(Time, Test) %>% 
-  shapiro_test(Value)
-
-# norm_test %>% mutate(P2 = round(p, digits = 3)) %>% mutate(sig = ifelse(P2>0.05, "n","y")) %>% count(Test, sig) %>% pivot_wider(Test, names_from = sig, values_from = n)
+  shapiro_test(Value) %>% 
+  mutate(P2 = round(p, digits = 3)) %>% 
+  mutate(norm = ifelse(P2>0.05, "Y","N")) %>% count(Test, norm) %>% 
+  pivot_wider(Test, names_from = norm, values_from = n)
 
 stat.test1 <- dat %>% group_by(Time, Test, Sex) %>% 
   t_test(Value ~ BirthMode) %>% 
@@ -157,31 +162,198 @@ stat.test1 <- dat %>% group_by(Time, Test, Sex) %>%
   add_significance("p") %>% 
   add_xy_position(x = "BirthMode", scales = "free", fun = "mean_sd")
 
+stat.test2 <- stat.test1 %>% 
+  mutate(grp = str_c(group1, group2, sep = "_")) %>% 
+  mutate(sig_lab = case_when(p.adj.signif != "ns" & grp == "CS_VF" ~ "A",
+                             p.adj.signif != "ns" & grp == "CSR_VF" ~ "B",
+                             p.adj.signif != "ns" & grp == "CS_CSR" ~ "C",
+                             p.adj.signif == "ns" ~ "")) %>%
+  arrange(Test, Time, Sex, sig_lab) %>% 
+  group_by(Test, Time, Sex) %>% 
+  summarize(sig_lab1 = paste(sig_lab, collapse = "")) %>% ungroup()
 
+stat.test3 <-  df_sum %>% mutate(Value_max = Value_mean + Value_se) %>% 
+  group_by(Time, Test, Sex) %>% 
+  summarise(Value_max = max(Value_max)) %>% ungroup() %>% 
+  left_join(stat.test2, by = c("Test","Time","Sex"))
 
+#day night
+dat_dn <- dat %>% group_by(MouseID, Day_or_Night, Test) %>% 
+  summarise(Value = mean(Value)) %>% ungroup() %>% 
+  left_join(map, by = "MouseID")
+
+dat_dn_sum <-  dat %>% group_by(Day_or_Night, Test, BirthMode, Sex) %>% 
+  summarise(Value_mean = mean(Value), Value_sd = sd(Value), N = n()) %>% ungroup() %>% 
+  mutate(Value_se = Value_sd / sqrt(N))
+
+stat.dn.test1 <- dat_dn %>% group_by(Day_or_Night, Test, Sex) %>% 
+  t_test(Value ~ BirthMode) %>% 
+  adjust_pvalue(method = "BH") %>% 
+  add_significance("p") %>% 
+  add_xy_position(x = "BirthMode", scales = "free", fun = "mean_sd")
 
 ```
 
 ### plot
-#### hourly
 ```{r}
-wdat <- dat %>% filter(Test == "V.O2")
+tt = "V.O2"
+ss = "M"
+
+wdat <- dat %>% filter(Test == tt)
 wdat_sum <- wdat %>% group_by(Sex, Time, BirthMode) %>% 
   summarise(Value_mean = mean(Value), Value_sd = sd(Value), N = n()) %>% 
   ungroup() %>% 
   mutate(Value_se = Value_sd/sqrt(N))
-wstat <- stat.test1 %>% filter(Test == "V.O2")
+wstat <- stat.test3 %>% filter(Test == tt)
 
-y_max <- (max(wdat_sum$Value_mean) + max(wdat_sum$Value_sd))*1.1
-y_min <- 0 - 0.05*y_max
+y_max <- max(wdat_sum$Value_mean + wdat_sum$Value_sd)*1.1
+y_min <- 0
 
-g <- ggplot(wdat_sum, aes(Time, Value_mean, color = BirthMode)) +
-  geom_path(aes(group = BirthMode)) + 
-  geom_point() + 
-  geom_linerange(aes(ymin = Value_mean - Value_se, ymax = Value_mean + Value_se)) + 
-  stat_pvalue_manual()
-  scale_y_continuous(limits = c(y_min, y_max)) + 
-  facet_grid(Sex~.)
+plot_hourly <- function(wdat_sum, wstat, ylab, tt, y_max, y_min, ss){
+  wwdat_sum <- wdat_sum %>% filter(Sex == ss)
+  wwstat <- wstat %>% filter(Sex == ss)
+  g <- ggplot(wwdat_sum, aes(Time, Value_mean)) + 
+    geom_point(aes(color = BirthMode)) + 
+    geom_path(aes(group = BirthMode, color = BirthMode)) + 
+    geom_errorbar(aes(ymin = Value_mean - Value_se, ymax = Value_mean + Value_se, color = BirthMode),
+                  width = 0.1) + 
+    geom_text(data = wwstat, aes(Time, Value_max, label = sig_lab1), vjust = 0) + 
+    geom_segment(data = data.frame(Time = c(0,19), Value_mean = c(y_min, y_min), T2 = c(7,24)), 
+                 aes(x=Time, xend=T2, y=Value_mean, yend=Value_mean),
+                 linewidth = 2) + 
+    scale_x_continuous(breaks = seq(0,23, by = 2)) + 
+    scale_y_continuous(n.breaks = 6, limits = c(y_min, y_max)) + 
+    labs(x = "Hour", y = ylab, title = paste(tt, ss)) + 
+    theme_classic() + theme(aspect.ratio = 1,
+                            panel.background = element_rect(fill = NA),
+                            plot.title = element_text(size=14,color="black",face='bold',hjust=0.5),
+                            axis.title = element_text(size=12,color="black",face='bold'),
+                            axis.title.y = element_text(size=12,color="black",face='bold'),
+                            axis.text.x = element_text(size=12,color="black",face='bold'),
+                            axis.text.y = element_text(size=12,color="black",face='bold'),
+                            legend.text = element_text(size=12,color="black",face='bold'),
+                            legend.title = element_text(size=12,color="black",face='bold')) 
+  g
+}
+g1 <- plot_hourly(wdat_sum, wstat, ylab, tt, y_max, y_min, ss)
+
+wdat_dn <- dat_dn %>% filter(Test == tt)
+wdat_dn_sum <- wdat_dn %>% group_by(Sex, Day_or_Night, BirthMode) %>% 
+  summarise(Value_mean = mean(Value), Value_sd = sd(Value), N = n()) %>% 
+  ungroup() %>% 
+  mutate(Value_se = Value_sd/sqrt(N))
+wstat <- stat.dn.test1 %>% filter(Test == tt)
+
+y_max <- max(wdat_dn_sum$Value_mean + wdat_dn_sum$Value_se)*1.1
+y_min <- 0
+
+plot_day_night <- function(wdat_dn_sum, wstat, ylab, tt, y_max, y_min, ss){
+  dat_ <- wdat_dn_sum %>% filter(Sex == ss)
+  wwstat <- wstat %>% filter(Sex == ss)
+  g <- ggplot(dat_, aes(BirthMode, Value_mean)) + 
+    #geom_col(aes(fill = BirthMode), position = position_dodge2()) + 
+    geom_col_pattern(aes(pattern = Day_or_Night, fill = BirthMode), 
+                     position = position_dodge2(), color = "black",  
+                     pattern_spacing = 0.01, pattern_density = 0.01, pattern_fill = "black") + 
+    scale_pattern_manual(values=c('none', 'stripe'), guide = "none") + 
+    geom_errorbar(aes(ymin = Value_mean, ymax = Value_mean + Value_se), 
+                  position = position_dodge2(width = 0.5, padding = 0.5)) + 
+    stat_pvalue_manual(data = wwstat, label = "p.adj.signif", hide.ns = TRUE, 
+                       tip.length = 0) + 
+    scale_color_manual(values = BirthMode_color) + 
+    scale_x_discrete(labels = c("Day   Night","Day   Night","Day   Night")) + 
+    scale_y_continuous(n.breaks = 6, limits = c(y_min, y_max), expand = c(0,0)) + 
+    labs(x = "", y = ylab, title = paste(tt, ss)) + 
+    guides(fill = guide_legend(override.aes = list(pattern = c("none", "none", "none")))) +
+    theme_classic() + theme(aspect.ratio = 1,
+                            panel.background = element_rect(fill = NA),
+                            plot.title = element_text(size=14,color="black",face='bold',hjust=0.5),
+                            axis.title = element_text(size=12,color="black",face='bold'),
+                            axis.title.y = element_text(size=12,color="black",face='bold'),
+                            axis.text.x = element_text(size=12,color="black",face='bold', hjust = 0.4),
+                            axis.text.y = element_text(size=12,color="black",face='bold'),
+                            legend.text = element_text(size=12,color="black",face='bold'),
+                            legend.title = element_text(size=12,color="black",face='bold'))
+  g
+}
+g2 <- plot_day_night(wdat_dn_sum, wstat, ylab, tt, y_max, y_min, ss)
+
+g_lst <- list()
+for (tt in dat$Test %>% unique()){
+  if(tt == "V.O2"){
+    ylab = expression(bold(V.O[2] (ml/min/kg)))
+  }else if(tt == "V.CO2"){
+    ylab = expression(bold(V.CO[2] (ml/min/kg)))
+  }else if(tt == "RER"){
+    ylab = expression(bold(RER (VCO[2]/VO[2])))
+  }else if(tt == "Heat"){
+    ylab = "Heat (kCal/hr)"
+  }else if(tt == "X total"){
+    ylab = "X total (counts)"
+  }else if(tt == "Y total"){
+    ylab = "Y total (counts)"
+  }else if(tt == "WHEEL"){
+    ylab = "Wheel Counts"
+  }else if(tt == "Drink"){
+    ylab = "Water intake (g/h)"
+  }else{
+    ylab = tt
+  }
+  
+  wdat <- dat %>% filter(Test == tt)
+  wdat_sum <- wdat %>% group_by(Sex, Time, BirthMode) %>% 
+    summarise(Value_mean = mean(Value), Value_sd = sd(Value), N = n()) %>% 
+    ungroup() %>% 
+    mutate(Value_se = Value_sd/sqrt(N))
+  wstat <- stat.test3 %>% filter(Test == tt)
+  y_max <- max(wdat_sum$Value_mean + wdat_sum$Value_se)*1.1
+  y_min <- 0
+  if(tt == "RER"){y_min = 0.8}
+  if(tt %in% c("X amb", "Y amb", "WHEEL")){
+    y_max <- wdat_sum %>% filter(Sex == "M") %>% 
+      mutate(Value_max = (Value_mean+Value_se)*1.1) %>% 
+      pull(Value_max) %>% max()
+    g_lst[[tt]][["hr"]][["M"]] <- plot_hourly(wdat_sum, wstat, ylab, tt, y_max, y_min, ss = "M")
+    y_max <- wdat_sum %>% filter(Sex == "F") %>% 
+      mutate(Value_max = (Value_mean+Value_se)*1.1) %>% 
+      pull(Value_max) %>% max()
+    g_lst[[tt]][["hr"]][["F"]] <- plot_hourly(wdat_sum, wstat, ylab, tt, y_max, y_min, ss = "F")
+  }else{
+    g_lst[[tt]][["hr"]][["M"]] <- plot_hourly(wdat_sum, wstat, ylab, tt, y_max, y_min, ss = "M")
+    g_lst[[tt]][["hr"]][["F"]] <- plot_hourly(wdat_sum, wstat, ylab, tt, y_max, y_min, ss = "F")
+  }
+  
+  wdat_dn <- dat_dn %>% filter(Test == tt)
+  wdat_dn_sum <- wdat_dn %>% group_by(Sex, Day_or_Night, BirthMode) %>% 
+    summarise(Value_mean = mean(Value), Value_sd = sd(Value), N = n()) %>% 
+    ungroup() %>% 
+    mutate(Value_se = Value_sd/sqrt(N))
+  wstat <- stat.dn.test1 %>% filter(Test == tt)
+  y_max <- max(wdat_dn_sum$Value_mean + wdat_dn_sum$Value_se)*1.1
+  y_min <- 0
+  if(tt %in% c("X amb", "Y amb", "WHEEL")){
+    y_max <- wdat_dn_sum %>% filter(Sex == "M") %>% 
+      mutate(Value_max = (Value_mean+Value_se)*1.1) %>% 
+      pull(Value_max) %>% max()
+    g_lst[[tt]][["dn"]][["M"]] <- plot_day_night(wdat_dn_sum, wstat, ylab, tt, y_max, y_min, ss = "M")
+    y_max <- wdat_dn_sum %>% filter(Sex == "F") %>% 
+      mutate(Value_max = (Value_mean+Value_se)*1.1) %>% 
+      pull(Value_max) %>% max()
+    g_lst[[tt]][["dn"]][["F"]] <- plot_day_night(wdat_dn_sum, wstat, ylab, tt, y_max, y_min, ss = "F")
+  }else{
+    g_lst[[tt]][["dn"]][["M"]] <- plot_day_night(wdat_dn_sum, wstat, ylab, tt, y_max, y_min, ss = "M")
+    g_lst[[tt]][["dn"]][["F"]] <- plot_day_night(wdat_dn_sum, wstat, ylab, tt, y_max, y_min, ss = "F")
+  }  
+  
+  p <- g_lst[[tt]][["hr"]][["M"]] + g_lst[[tt]][["dn"]][["M"]] + 
+    g_lst[[tt]][["hr"]][["F"]] + g_lst[[tt]][["dn"]][["F"]] + 
+    plot_layout(guides = "collect", ncol = 2) + 
+    plot_annotation(title = "", tag_levels = 'A') & theme(plot.tag = element_text(size = 12, face = "bold"), 
+                                                          legend.position = "right")
+  ggsave(filename = paste0(path_rec,"output/CLAMS/test_", tt,"_panel.pdf"), device = cairo_pdf, 
+       plot = p, width = 10, height = 10, units = "in", dpi = 300)
+}
+
 
 
 ```
@@ -220,13 +392,14 @@ dat2 <- lapply(excel_sheets(glu_2),function(tt){
 dat <- rbind(dat1, dat2) %>% 
   pivot_longer(cols = c(T0, T15, T30, T60, T90, T120), names_to = "Time", values_to = "Value_text") %>%
   left_join(map, by = "MouseID")
-# fill HI with max value
-dat %>% group_by(Test) %>% summarize(max(as.integer(Value_text), na.rm = T))
-
-dat <- dat %>% 
+# do I fill HI with max value
+# dat %>% group_by(Test) %>% summarize(max(as.integer(Value_text), na.rm = T))
+# 
+dat <- dat %>%
   mutate(Value = case_when(Value_text == "HI" & Test == "GTT" ~ 750,
                             Value_text == "HI" & Test == "ITT" ~ 651,
-                            TRUE ~ as.integer(Value_text))) 
+                            TRUE ~ as.integer(Value_text)))
+#dat <- dat %>% mutate(Value = as.integer(Value_text))
 #*animal excluded due to "HI" time 0
 dat <- dat %>% filter(MouseID != "F036.P7")
 
@@ -248,7 +421,7 @@ dat_sum <- dat %>% group_by(Time, Test, Sex, BirthMode) %>%
 ## AUC
 dat_w <- dat %>% pivot_wider(id_cols = c(MouseID, Test, Sex, BirthMode), 
                              names_from = Time, values_from = Value) %>% 
-  mutate(AUC = 1/2*(T0+T30)*30 + 1/2*(T30+T60)*30 + 1/2*(T60+T90)*30 + 1/2*(T90+T120)*30)
+  mutate(AUC = 1/2*(T0+T30) + 1/2*(T30+T60) + 1/2*(T60+T90) + 1/2*(T90+T120))
 
 ```
 
@@ -273,21 +446,19 @@ plot_time_value <- function(wdat_sum, tt, ss){
     geom_errorbar(aes(ymin = Value_mean - Value_se, ymax = Value_mean + Value_se),
                   width = 0.9) + 
     scale_x_continuous(breaks = c(0,15,30,45,60,75,90,105,120)) + 
-    scale_y_continuous(limits = c(0, max(dat_$Value_mean+dat_$Value_sd)), 
-                       expand = c(0,0)) + 
     scale_color_manual(values = BirthMode_color) + 
     labs(x = "Time min", y = ylab, title = paste(tt, ss)) +
     theme_classic() + theme(aspect.ratio = 1,
                             panel.background = element_rect(fill = NA),
                             plot.title = element_text(size=14,color="black",face='bold',hjust=0.5),
-                            axis.title.y = element_text(size=12,color="black",face='bold'),
+                            axis.title = element_text(size=12,color="black",face='bold'),
                             axis.text.x = element_text(size=12,color="black",face='bold'),
                             axis.text.y = element_text(size=12,color="black",face='bold'),
                             legend.text = element_text(size=12,color="black",face='bold'),
                             legend.title = element_text(size=12,color="black",face='bold'))
   g
 }
-g1 <- plot_time_value(wdat_sum, tt, ss)
+
 
 plot_auc <- function(wdat_w, tt, ss){
   dat_ <- wdat_w %>% 
@@ -295,10 +466,18 @@ plot_auc <- function(wdat_w, tt, ss){
     summarise(Value_mean = mean(AUC), Value_sd = sd(AUC), N = n()) %>% 
     ungroup() %>% 
     mutate(Value_se = Value_sd/sqrt(N)) 
+  
+  wstat <- dat_w %>% dunn_test(AUC ~ BirthMode) %>% 
+    adjust_pvalue(method = "BH") %>% 
+    add_significance("p.adj") %>% 
+    add_xy_position(x = "BirthMode", scales = "free", fun = "mean_sd")
+    
   g <- ggplot(dat_, aes(x = BirthMode, y = Value_mean, color = BirthMode)) + 
-    geom_col(aes(fill = BirthMode)) + 
-    geom_errorbar(aes(ymin = Value_mean - Value_se, ymax = Value_mean + Value_se),
-                  width = 0.5) +
+    geom_col(aes(fill = BirthMode), color = "black") + 
+    geom_errorbar(aes(ymin = Value_mean, ymax = Value_mean + Value_se),
+                  width = 0.5, color = "black") + 
+    geom_text(aes(y = 1, label = N), color = "gray70", size = 36/.pt, vjust = 0) + 
+    stat_pvalue_manual(wstat, label = "p.adj.signif", tip.length = 0, hide.ns = T, size = 12/.pt) +
     scale_color_manual(values = BirthMode_color, aesthetics = c("color","fill")) + 
     labs(x = "", y = "AUC (mg/dL*min)", title = paste(tt, ss)) + 
     theme_classic() + theme(aspect.ratio = 1,
@@ -312,11 +491,54 @@ plot_auc <- function(wdat_w, tt, ss){
   g
 }
 
-g2 <- plot_auc(wdat_w, tt, ss)
+g_lst <- list()
+for(tt in c("GTT","ITT")){
+  for(ss in c("M","F")){
+    wdat_sum <- dat_sum %>% filter(Test == tt, Sex == ss)
+    wdat_w <- dat_w %>% filter(Test == tt, Sex == ss)
+    g_lst[[tt]][[ss]][["line"]] <- plot_time_value(wdat_sum, tt, ss)
+    g_lst[[tt]][[ss]][["auc"]] <- plot_auc(wdat_w, tt, ss)
+  }
+}
+
+g_lst[["GTT"]][["M"]][["line"]] <- g_lst[["GTT"]][["M"]][["line"]] + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,850), breaks = c(0,200,400,600,800))
+g_lst[["GTT"]][["F"]][["line"]] <- g_lst[["GTT"]][["F"]][["line"]] + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,850), breaks = c(0,200,400,600,800))
+
+g_lst[["GTT"]][["M"]][["auc"]] <- g_lst[["GTT"]][["M"]][["auc"]] + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,4000), breaks = c(0,1000,2000,3000,4000))
+g_lst[["GTT"]][["F"]][["auc"]] <- g_lst[["GTT"]][["F"]][["auc"]] + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,4000), breaks = c(0,1000,2000,3000,4000))
+
+p1 <- g_lst[["GTT"]][["M"]][["line"]] + g_lst[["GTT"]][["M"]][["auc"]] + 
+  g_lst[["GTT"]][["F"]][["line"]] + g_lst[["GTT"]][["F"]][["auc"]] + 
+  plot_layout(guides = "collect", ncol = 2) + 
+  plot_annotation(title = "", tag_levels = 'a') & theme(plot.tag = element_text(size = 12, face = "bold"), 
+                                                        legend.position = "right")
+
+ggsave(filename = paste0(path_rec,"output/Glucose/GTT_panel.pdf"), device = cairo_pdf, 
+       plot = p1, width = 10, height = 10, units = "in", dpi = 300)
 
 
+g_lst[["ITT"]][["M"]][["line"]] <- g_lst[["ITT"]][["M"]][["line"]] + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,260), breaks = c(0,50,100,150,200,250))
+g_lst[["ITT"]][["F"]][["line"]] <- g_lst[["ITT"]][["F"]][["line"]] + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,260), breaks = c(0,50,100,150,200,250))
 
+g_lst[["ITT"]][["M"]][["auc"]] <- g_lst[["ITT"]][["M"]][["auc"]] + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,700), breaks = c(0,200, 400, 600))
+g_lst[["ITT"]][["F"]][["auc"]] <- g_lst[["ITT"]][["F"]][["auc"]] + 
+  scale_y_continuous(expand = c(0,0), limits = c(0,700), breaks = c(0,200, 400, 600))
 
+p2 <- g_lst[["ITT"]][["M"]][["line"]] + g_lst[["ITT"]][["M"]][["auc"]] + 
+  g_lst[["ITT"]][["F"]][["line"]] + g_lst[["ITT"]][["F"]][["auc"]] + 
+  plot_layout(guides = "collect", ncol = 2) + 
+  plot_annotation(title = "", tag_levels = 'a') & theme(plot.tag = element_text(size = 12, face = "bold"), 
+                                                        legend.position = "right")
+
+ggsave(filename = paste0(path_rec,"output/Glucose/ITT_panel.pdf"), device = cairo_pdf, 
+       plot = p2, width = 10, height = 10, units = "in", dpi = 300)
 
 
 ```
