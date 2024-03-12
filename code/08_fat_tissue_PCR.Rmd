@@ -185,7 +185,141 @@ g <- ggplot(wdat_sum, aes(Time, Value_mean, color = BirthMode)) +
 
 
 ```
+## Glucose
+### load data
+```{r}
+glu_1 = paste0(path_rec,"data/ExperimentRecords/Result_from_Troy/DB Behavior1a 1b GTT ITT.xlsx")
+glu_2 = paste0(path_rec,"data/ExperimentRecords/Result_from_Troy/DB Behavior2a 2b GTT ITT.xlsx")
 
+Mapping_file = paste0(path_rec,"data/ExperimentRecords/Result_from_Troy/BehaviorAnimalMetadata-20190124-JW.xlsx")
+
+map <- read_excel(Mapping_file) 
+
+dat1 <- lapply(excel_sheets(glu_1),function(tt){
+  a <- read_excel(glu_1, sheet = tt, range = "B3:L19", col_names = T)
+  a <- a %>% filter(!is.na(`ID#`)) %>% 
+    transmute(MouseID = `ID#`, BW, Inj_vol = `Inj vol`,
+              T0 = `time = 0`, T15 = `15`, T30 = `30`, T60 = `60`, T90 = `90`, T120 = `120`) %>% 
+    mutate(MouseID = str_replace(MouseID, "f", "F")) %>% 
+    mutate(MouseID = str_replace(MouseID, "p", "P")) %>% 
+    mutate(Test = ifelse(str_detect(tt,"GTT"),"GTT","ITT"))
+  a
+}) %>% do.call(rbind,.) 
+
+dat2 <- lapply(excel_sheets(glu_2),function(tt){
+  a <- read_excel(glu_2, sheet = tt, range = "B3:L19", col_names = T)
+  a <- a %>% filter(!is.na(`ID#`)) %>% 
+    transmute(MouseID = `ID#`, BW, Inj_vol = `Inj vol`,
+              T0 = `time = 0`, T15 = `15`, T30 = `30`, T60 = `60`, T90 = `90`, T120 = `120`) %>% 
+    mutate(MouseID = str_replace(MouseID, "f", "F")) %>% 
+    mutate(MouseID = str_replace(MouseID, "p", "P")) %>% 
+    mutate(Test = ifelse(str_detect(tt,"GTT"),"GTT","ITT"))
+  a
+}) %>% do.call(rbind,.) 
+
+dat <- rbind(dat1, dat2) %>% 
+  pivot_longer(cols = c(T0, T15, T30, T60, T90, T120), names_to = "Time", values_to = "Value_text") %>%
+  left_join(map, by = "MouseID")
+# fill HI with max value
+dat %>% group_by(Test) %>% summarize(max(as.integer(Value_text), na.rm = T))
+
+dat <- dat %>% 
+  mutate(Value = case_when(Value_text == "HI" & Test == "GTT" ~ 750,
+                            Value_text == "HI" & Test == "ITT" ~ 651,
+                            TRUE ~ as.integer(Value_text))) 
+#*animal excluded due to "HI" time 0
+dat <- dat %>% filter(MouseID != "F036.P7")
+
+norm_test <- dat %>% group_by(Time, Test) %>% 
+  shapiro_test(Value) %>% 
+  mutate(Norm = ifelse(p>0.05, "Y", "N"))
+
+stat.test1 <- dat %>% group_by(Time, Test, Sex) %>% 
+  dunn_test(Value ~ BirthMode) %>% 
+  adjust_pvalue(method = "BH") %>% 
+  add_significance("p.adj") %>% 
+  add_xy_position(x = "BirthMode", scales = "free", fun = "mean_sd")
+
+dat_sum <- dat %>% group_by(Time, Test, Sex, BirthMode) %>% 
+  summarise(Value_mean = mean(Value, na.rm = TRUE), Value_sd = sd(Value, na.rm = TRUE), N = sum(!is.na(Value))) %>% 
+  ungroup() %>% 
+  mutate(Value_se = Value_sd/sqrt(N))
+
+## AUC
+dat_w <- dat %>% pivot_wider(id_cols = c(MouseID, Test, Sex, BirthMode), 
+                             names_from = Time, values_from = Value) %>% 
+  mutate(AUC = 1/2*(T0+T30)*30 + 1/2*(T30+T60)*30 + 1/2*(T60+T90)*30 + 1/2*(T90+T120)*30)
+
+```
+
+### plot
+```{r}
+
+# tt in c("GTT","ITT")
+# ss in c("M","F") 
+tt = "GTT";ss = "M"
+if(tt == "GTT"){}
+wdat_sum <- dat_sum %>% filter(Test == tt, Sex == ss)
+wdat_w <- dat_w %>% filter(Test == tt, Sex == ss)
+
+plot_time_value <- function(wdat_sum, tt, ss){
+  dat_ <- wdat_sum %>% 
+    mutate(Time = as.integer(str_remove(Time, "^T"))) %>% 
+    arrange(Time)
+  ylab = "Glucose (mg/dL)"
+  g <- ggplot(dat_, aes(x = Time, Value_mean, color = BirthMode)) +
+    geom_point() + 
+    geom_path(aes(group = BirthMode)) + 
+    geom_errorbar(aes(ymin = Value_mean - Value_se, ymax = Value_mean + Value_se),
+                  width = 0.9) + 
+    scale_x_continuous(breaks = c(0,15,30,45,60,75,90,105,120)) + 
+    scale_y_continuous(limits = c(0, max(dat_$Value_mean+dat_$Value_sd)), 
+                       expand = c(0,0)) + 
+    scale_color_manual(values = BirthMode_color) + 
+    labs(x = "Time min", y = ylab, title = paste(tt, ss)) +
+    theme_classic() + theme(aspect.ratio = 1,
+                            panel.background = element_rect(fill = NA),
+                            plot.title = element_text(size=14,color="black",face='bold',hjust=0.5),
+                            axis.title.y = element_text(size=12,color="black",face='bold'),
+                            axis.text.x = element_text(size=12,color="black",face='bold'),
+                            axis.text.y = element_text(size=12,color="black",face='bold'),
+                            legend.text = element_text(size=12,color="black",face='bold'),
+                            legend.title = element_text(size=12,color="black",face='bold'))
+  g
+}
+g1 <- plot_time_value(wdat_sum, tt, ss)
+
+plot_auc <- function(wdat_w, tt, ss){
+  dat_ <- wdat_w %>% 
+    group_by(BirthMode) %>% 
+    summarise(Value_mean = mean(AUC), Value_sd = sd(AUC), N = n()) %>% 
+    ungroup() %>% 
+    mutate(Value_se = Value_sd/sqrt(N)) 
+  g <- ggplot(dat_, aes(x = BirthMode, y = Value_mean, color = BirthMode)) + 
+    geom_col(aes(fill = BirthMode)) + 
+    geom_errorbar(aes(ymin = Value_mean - Value_se, ymax = Value_mean + Value_se),
+                  width = 0.5) +
+    scale_color_manual(values = BirthMode_color, aesthetics = c("color","fill")) + 
+    labs(x = "", y = "AUC (mg/dL*min)", title = paste(tt, ss)) + 
+    theme_classic() + theme(aspect.ratio = 1,
+                            panel.background = element_rect(fill = NA),
+                            plot.title = element_text(size=14,color="black",face='bold',hjust=0.5),
+                            axis.title.y = element_text(size=12,color="black",face='bold'),
+                            axis.text.x = element_text(size=12,color="black",face='bold'),
+                            axis.text.y = element_text(size=12,color="black",face='bold'),
+                            legend.text = element_text(size=12,color="black",face='bold'),
+                            legend.title = element_text(size=12,color="black",face='bold'))
+  g
+}
+
+g2 <- plot_auc(wdat_w, tt, ss)
+
+
+
+
+
+
+```
 
 
 
