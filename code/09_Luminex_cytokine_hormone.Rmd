@@ -1,0 +1,69 @@
+---
+title: "CTF"
+author: "Haipeng Sun"
+date: "7/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## library
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(grid)
+library(gridExtra)
+library(gtable)
+library(ggrepel)
+library(rlist)
+library(ggpubr)
+library(readxl)
+library(rstatix)
+library(tidyverse)
+```
+
+## load general data
+```{r}
+load(file = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/BW_and_phylo.RData")
+```
+
+
+## load cytokine data
+```{r}
+dat_result = read_excel("~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/ExperimentRecords/Cytokine_Luminex/2022-06-13 LX Haipeng-Dominguez Plate 1 Final Results.xlsx",range = "B2:I82")
+meta = read_excel("~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/ExperimentRecords/Cytokine_Luminex/Metadat-Cytokine-immune_sharing-20220610-hs.xlsx")
+dat_mean = dat_result %>% group_by(Sample) %>% summarise_all(mean) %>% 
+  mutate(TubeID = str_c("CSR2019.",str_sub(Sample, start = 8))) %>% 
+  right_join(meta, by = "TubeID")
+
+temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/cytokine/"
+```
+
+## plot
+```{r}
+dat <- dat_mean %>% dplyr::select(TubeID, MouseID, Sex, BirthMode, IFNg,`IL-6`,`IL-22`,`IL-10`,`IL-12p70`, `IL-17A`, TNFa) %>% 
+  pivot_longer(cols = c(IFNg,`IL-6`,`IL-22`,`IL-10`,`IL-12p70`, `IL-17A`, TNFa), 
+               values_to = "Value", names_to = "cytokine")
+
+shapiro_res <- dat %>% group_by(cytokine) %>% 
+  shapiro_test(Value) %>% 
+  mutate(pval = round(p, digits = 4))
+
+stat_res <- dat %>% group_by(cytokine, Sex) %>% 
+  wilcox_test(Value ~ BirthMode) %>% 
+  adjust_pvalue(method = "BH") %>% 
+  add_significance("p.adj") %>% 
+  add_xy_position(x = "BirthMode", scales = "free", fun = "mean_sd")
+
+
+
+
+
+
+
+
+
+
+
+```
+
