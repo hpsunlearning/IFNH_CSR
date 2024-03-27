@@ -19,6 +19,7 @@ library(rlist)
 library(ggpubr)
 library(readxl)
 library(rstatix)
+library(patchwork)
 library(tidyverse)
 ```
 
@@ -39,7 +40,7 @@ dat_mean = dat_result %>% group_by(Sample) %>% summarise_all(mean) %>%
 temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/cytokine/"
 ```
 
-## plot
+### plot
 ```{r}
 dat <- dat_mean %>% dplyr::select(TubeID, MouseID, Sex, BirthMode, IFNg,`IL-6`,`IL-22`,`IL-10`,`IL-12p70`, `IL-17A`, TNFa) %>% 
   pivot_longer(cols = c(IFNg,`IL-6`,`IL-22`,`IL-10`,`IL-12p70`, `IL-17A`, TNFa), 
@@ -48,22 +49,143 @@ dat <- dat_mean %>% dplyr::select(TubeID, MouseID, Sex, BirthMode, IFNg,`IL-6`,`
 shapiro_res <- dat %>% group_by(cytokine) %>% 
   shapiro_test(Value) %>% 
   mutate(pval = round(p, digits = 4))
-
+ 
 stat_res <- dat %>% group_by(cytokine, Sex) %>% 
-  wilcox_test(Value ~ BirthMode) %>% 
-  adjust_pvalue(method = "BH") %>% 
-  add_significance("p.adj") %>% 
-  add_xy_position(x = "BirthMode", scales = "free", fun = "mean_sd")
+  tukey_hsd(Value ~ BirthMode) %>% 
+  add_xy_position(x = "BirthMode", scales = "free", fun = "mean_sd") 
 
-
-
-
-
-
-
-
-
-
+g_lst <- list()
+ck = "TNFa"
+for (ck in c("IFNg","IL-6","IL-22","IL-10","IL-12p70", "IL-17A","TNFa")){
+  wdat <- dat %>% filter(cytokine == ck)
+  wstat <- stat_res %>% filter(cytokine == ck) %>% filter(p.adj.signif!="ns")
+  g <- ggplot(wdat, aes(BirthMode, Value)) + 
+    geom_point(aes(color = BirthMode), position = position_jitterdodge()) + 
+    geom_boxplot(aes(fill = BirthMode, color = BirthMode),alpha = 0.5, outlier.alpha = NA) + 
+    stat_pvalue_manual(data = wstat, label = "p.adj.signif", tip.length = 0, hide.ns = TRUE) +
+    scale_color_manual(values = BirthMode_color, aesthetics = c("colour","fill")) +
+    labs(x = "", y = paste0(ck, " pg/mL"), title = ck) +
+    facet_grid(.~Sex, labeller = labeller(Sex = Sex_labs)) + 
+    guides(colour = "none", fill = "none") +
+    theme_bw() + theme(aspect.ratio = 1,
+                       panel.background = element_rect(fill = NA),
+                       plot.title = element_text(size=14,color="black",face='bold',hjust=0.5),
+                       strip.text = element_text(size=12,color="black",face='bold'),
+                       axis.title.y = element_text(size=12,color="black",face='bold'),
+                       axis.text.x = element_text(size=12,color="black",face='bold'),
+                       axis.text.y = element_text(size=12,color="black",face='bold'),
+                       legend.text = element_text(size=12,color="black",face='bold'),
+                       legend.title = element_text(size=12,color="black",face='bold'),
+                       plot.margin = unit(c(0.5,0.5,0.5,0.5), "in"))
+  g_lst[[ck]]<- g
+  ggsave(filename = paste0(temp_out,ck, "_by_sex.pdf"), device = cairo_pdf, 
+         plot = g, width = 6, height = 4, units = "in", dpi = 300)
+} 
 
 ```
+
+
+## load horomone data
+```{r}
+dat_result1 = read_csv("~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/ExperimentRecords/Hormone_Luminex/DBB, plate 1, jan4-5 2022_20220105_143735.csv", skip = 352, n_max = 96)
+dat_result1 = dat_result1 %>% 
+  mutate(Sample = ifelse(str_detect(Sample, "^\\."), str_c("CSR2019", Sample, sep = ""),Sample))
+dat_result1$Plate = 1
+
+dat_result2 = read_csv("~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/ExperimentRecords/Hormone_Luminex/DBB plate 2 1 25 2022_20220126_142741.csv", skip = 352, n_max = 96)
+dat_result2 = dat_result2 %>% 
+  mutate(Sample = ifelse(str_detect(Sample, "^\\d"), str_c("CSR2019.0", Sample, sep = ""),Sample))
+dat_result2$Plate = 2
+
+dat_result3 = read_csv("~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/ExperimentRecords/Hormone_Luminex/DBB plate 3_ 2 1 22_20220201_141001.csv", skip = 352, n_max = 68)
+dat_result3 = dat_result3 %>% 
+  mutate(Sample = ifelse(str_detect(Sample, "^[0-9]{4}$"), str_c("CSR2019.", Sample, sep = ""),Sample)) %>% 
+  mutate(Sample = ifelse(str_detect(Sample, "^[0-9]{3}$"), str_c("CSR2019.0", Sample, sep = ""),Sample))
+dat_result3$Plate = 3
+
+result = rbind(dat_result1, dat_result2, dat_result3)
+result = result %>% mutate_at(c("ghrelin (active)", "GIP", "glp-1", "insulin", "leptin", "ppy"), as.numeric) %>% 
+  filter(str_detect(Sample, "CSR"))
+#### manually discard the Low input wells
+result = result %>% filter(!(Location=="86(1,F11)" & Sample=="CSR2019.0339")) %>%
+  filter(!(Location=="88(1,H11)" & Sample=="CSR2019.0348")) %>% 
+  filter(!(Location=="96(1,H12)" & Sample=="CSR2019.0384")) %>% 
+  filter(!(Location=="76(1,D10)" & Sample=="CSR2019.0825")) %>%
+  filter(!(Location=="84(1,D11)" & Sample=="CSR2019.0861"))
+#### fill missing value with 1/2 lowest detect limit
+names(result) = c("Location","Sample","Ghrelin","GIP","GLP_1","Insulin","Leptin", "PYY","Total Events","Plate")
+result = result %>% 
+  mutate(Ghrelin = ifelse(is.na(Ghrelin), 5, Ghrelin),
+         GIP = ifelse(is.na(GIP), 2.4, GIP),
+         GLP_1 = ifelse(is.na(GLP_1), 20.5, GLP_1),
+         Insulin = ifelse(is.na(Insulin), 68.5, Insulin),
+         Leptin = ifelse(is.na(Leptin), 41, Leptin),
+         PYY = ifelse(is.na(PYY), 4.1, PYY))
+#### calculate mean
+result = result %>% 
+  group_by(Sample) %>% 
+  summarise_at(c("Ghrelin","GIP","GLP_1","Insulin","Leptin","PYY"),mean)
+
+meta = read_excel("~/Dropbox/rutgers/20220722_IFNH_CSR_new/data/ExperimentRecords/Hormone_Luminex/Metadata_CSR_and_HBBF_114total.xlsx", sheet = "Sheet1", n_max = 100)
+
+dat = result  %>% left_join(meta, by = c("Sample" = "TubeID"))
+
+temp_out = "~/Dropbox/rutgers/20220722_IFNH_CSR_new/output/hormone/"
+```
+
+### plot
+```{r}
+datl <- dat %>% dplyr::select(Sample, MouseID, Sex, BirthMode, TimePointInWeeks, Ghrelin, GIP, GLP_1, Insulin, Leptin, PYY) %>% 
+  pivot_longer(cols = c(Ghrelin, GIP, GLP_1, Insulin, Leptin, PYY), 
+               values_to = "Value", names_to = "hormone")
+
+shapiro_res <- datl %>% group_by(hormone) %>% 
+  shapiro_test(Value) %>% 
+  mutate(pval = round(p, digits = 4))
+ 
+stat_res <- datl %>% group_by(hormone, Sex, TimePointInWeeks) %>% 
+  tukey_hsd(Value ~ BirthMode) %>% 
+  add_xy_position(x = "BirthMode", scales = "free", fun = "mean_sd") 
+
+g_lst <- list()
+hm = "Ghrelin"
+for (hm in c("Ghrelin", "GIP", "GLP_1", "Insulin", "Leptin", "PYY")){
+  wdat <- datl %>% filter(hormone == hm) %>% mutate(TimePointInWeeks = as.character(TimePointInWeeks))
+  wstat <- stat_res %>% filter(hormone == hm) %>% filter(p.adj.signif!="ns")
+  g <- ggplot(wdat, aes(TimePointInWeeks, Value, color = BirthMode)) + 
+    geom_point(position = position_jitterdodge(jitter.width = 0.1, dodge.width = .8)) + 
+    geom_boxplot(aes(fill = BirthMode),position = position_dodge(.8), alpha = 0.5, outlier.alpha = NA) + 
+    #stat_pvalue_manual(data = wstat, label = "p.adj.signif", tip.length = 0, hide.ns = TRUE) +
+    scale_color_manual(values = BirthMode_color, aesthetics = c("colour","fill")) + 
+    scale_x_discrete(labels = c("week2", "week3", "week6")) +
+    labs(x = "", y = paste0(hm, " pg/mL"), title = hm) +
+    facet_grid(.~Sex, labeller = labeller(Sex = Sex_labs)) + 
+    #guides(colour = "none", fill = "none") +
+    theme_bw() + theme(aspect.ratio = 1,
+                       panel.background = element_rect(fill = NA),
+                       plot.title = element_text(size=14,color="black",face='bold',hjust=0.5),
+                       strip.text = element_text(size=12,color="black",face='bold'),
+                       axis.title.y = element_text(size=12,color="black",face='bold'),
+                       axis.text.x = element_text(size=12,color="black",face='bold'),
+                       axis.text.y = element_text(size=12,color="black",face='bold'),
+                       legend.text = element_text(size=12,color="black",face='bold'),
+                       legend.title = element_text(size=12,color="black",face='bold'),
+                       plot.margin = unit(c(0.5,0.5,0.5,0.5), "in"))
+  g_lst[[hm]]<- g
+  ggsave(filename = paste0(temp_out,hm, "_by_sex_age.pdf"), device = cairo_pdf, 
+         plot = g, width = 7, height = 4, units = "in", dpi = 300)
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
 

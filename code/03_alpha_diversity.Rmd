@@ -202,10 +202,8 @@ write.csv(do.call(rbind,lapply(1:length(all_res), function(n){all_res[[n]]$anova
           file = paste0(temp_out,"alpha/lm_anova_Age_group_res.csv"), row.names = FALSE)
 ```
 
-### compare birthmode
+### compare all stat
 ```{r}
-
-
 dat_alpha_pup <- dat_alpha %>% filter(Generation=="F1")
 metric <- names(alpha_p)[2:5]
 ###TimePointInWeeks
@@ -249,6 +247,7 @@ write.csv(all_res$grp, row.names = FALSE,
           file = paste0(temp_out,"alpha/kw_aov_grp_birthmode_by_Sex_Age_group.csv"))
 write.csv(all_res$comp, row.names = FALSE,
           file = paste0(temp_out,"alpha/kw_aov_comp_birthmode_by_Sex_Age_group.csv"))
+
 ```
 
 ### plot alpha comparsion
@@ -329,6 +328,58 @@ g <- ggplot(data = dat,
                      title = element_text(size=10,color="black",face='bold'))
 ggsave(filename = paste0(temp_out,"alpha/pup_by_sex_by_Age_group.pdf"), device = cairo_pdf, 
        plot = g, width = 7, height = 6, units = "in", dpi = 300)
+```
+
+## stat on Age or Sex
+```{r}
+dat_alpha_pup <- dat_alpha %>% filter(Generation=="F1")
+metric <- names(alpha_p)[2:5]
+
+###Sex
+lst_df <- expand.grid(dat_alpha_pup$TimePoint %>% unique(), 
+                      metric, stringsAsFactors = F)
+names(lst_df) <- c("TimePoint", "Metrics")
+
+all_res_2 <- map_dfr(1:nrow(lst_df), function(i){
+  wdat <- dat_alpha_pup %>% filter(TimePoint == lst_df[i,"TimePoint"])
+  res <- comp_kw_aov(wdat = wdat, x = "Sex", y = lst_df[i,"Metrics"])
+  res$grp <- cbind(res$grp, lst_df[i,],row.names = NULL)
+  res$comp <- cbind(res$comp, lst_df[i,],row.names = NULL)
+  res
+})
+
+all_res_2$comp$KW_padj <- p.adjust(all_res_2$comp$KW_pvalue, method = "fdr")
+all_res_2$comp$aov_padj <- p.adjust(all_res_2$comp$aov_pvalue, method = "fdr")
+write.csv(all_res_2$grp, row.names = FALSE,
+          file = paste0(temp_out,"alpha/kw_aov_grp_Sex_by_Age_group.csv"))
+write.csv(all_res_2$comp, row.names = FALSE,
+          file = paste0(temp_out,"alpha/kw_aov_comp_Sex_by_Age_group.csv"))
+
+###Age_group
+lst_df <- expand.grid(dat_alpha_pup$Sex %>% unique(), 
+                      metric, stringsAsFactors = F)
+names(lst_df) <- c("Sex", "Metrics")
+
+all_res_3 <- map(1:nrow(lst_df), function(i){
+  wdat <- dat_alpha_pup %>% filter(Sex == lst_df[i,"Sex"])
+  res <- comp_kw_aov(wdat = wdat, x = "TimePoint", y = lst_df[i,"Metrics"])
+  res$grp <- cbind(res$grp, lst_df[i,],row.names = NULL)
+  res$comp <- cbind(res$comp, lst_df[i,],row.names = NULL)
+  res
+})
+
+dat_grp <- rbind(all_res_3[[1]]$grp,all_res_3[[2]]$grp,all_res_3[[3]]$grp,all_res_3[[4]]$grp, 
+                 all_res_3[[5]]$grp, all_res_3[[6]]$grp, all_res_3[[7]]$grp, all_res_3[[8]]$grp)
+write.csv(dat_grp, row.names = FALSE,
+          file = paste0(temp_out,"alpha/kw_aov_grp_Age_grp_by_Sex.csv"))
+
+dat_comp <- rbind(all_res_3[[1]]$comp,all_res_3[[2]]$comp,all_res_3[[3]]$comp,all_res_3[[4]]$comp, 
+                 all_res_3[[5]]$comp, all_res_3[[6]]$comp, all_res_3[[7]]$comp, all_res_3[[8]]$comp)
+dat_comp$KW_padj <- p.adjust(dat_comp$KW_pvalue, method = "fdr")
+dat_comp$aov_padj <- p.adjust(dat_comp$aov_pvalue, method = "fdr")
+
+write.csv(dat_comp, row.names = FALSE,
+          file = paste0(temp_out,"alpha/kw_aov_comp_Age_grp_by_Sex.csv"))
 ```
 
 ## overweight 
