@@ -235,7 +235,7 @@ for(dd in c("uu","wu","bray","jaccard")){
       }) %>% do.call(rbind, .) %>% 
         mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex") 
       # permanova 
-      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode + Sex + TimePoint, data = wmeta_s, by = "margin")) %>% 
+      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode + Sex, data = wmeta_s, by = "margin")) %>% 
         as.data.frame() %>% mutate(Comp = "All") %>% 
         filter(!is.na(F)) %>%  
         mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex") 
@@ -395,7 +395,7 @@ for(dd in c("uu","wu","bray","jaccard")){
       }) %>% do.call(rbind, .) %>% 
         mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex|FamilyID") 
       # permanova 
-      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode + Sex + TimePoint, data = wmeta_s, by = "margin", strata = wmeta_s$FamilyID)) %>% 
+      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode + Sex, data = wmeta_s, by = "margin", strata = wmeta_s$FamilyID)) %>% 
         as.data.frame() %>% mutate(Comp = "All") %>% 
         filter(!is.na(F)) %>%  
         mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex|FamilyID") 
