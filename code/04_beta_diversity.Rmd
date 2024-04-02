@@ -163,102 +163,320 @@ for(dd in c("uu","wu","bray","jaccard")){
     filter(Generation == "F1")
   wdist <- dist_subset(wdist, wmeta$SampleID)
   
-  ## BirthMode by sex and TimePoint pairwise
-  lst_df <- expand.grid(wmeta$Sex %>% unique(), 
-                        wmeta$TimePoint %>% unique(), 
-                        stringsAsFactors = F)
-  names(lst_df) <- c("Sex", "TimePoint")
-  res_sum <- lapply(1:nrow(lst_df), function(i){
-    wmeta_s <- wmeta %>% filter(Sex == lst_df[i,"Sex"], TimePoint == lst_df[i,"TimePoint"])
-    wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
-    disper <- betadisper(wdist_s, wmeta_s$BirthMode)   
-    d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-      rownames_to_column(var = "Comp")
-    d1 <- d1 %>% mutate(Sex = lst_df[i,"Sex"], TimePoint = lst_df[i,"TimePoint"], Variable = "BirthMode")
-    
-    comp <- combn(wwmeta$BirthMode %>% unique() %>% as.character(),2)
-    res <- lapply(1:ncol(comp), function(i){
-      wmeta_ss <- wmeta_s %>% filter(BirthMode %in% comp[,i])
-      wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
-      calcOmega2_dm(adonis2(wdist_ss ~ BirthMode, data = wmeta_ss, by = "terms")) %>% 
-        as.data.frame() %>% mutate(Comp = str_c(comp[1,i], comp[2,i], sep = "-")) %>% 
-        filter(!is.na(F))
-    }) %>% do.call(rbind, .) %>% 
-      mutate(Sex = lst_df[i,"Sex"], TimePoint = lst_df[i,"TimePoint"], fo = "~ BirthMode")    
-    list(dispersion = d1, permanova = res)
-  })
-  res_dispersion_1 <- lapply(1:length(res_sum),function(i){res_sum[[i]]$dispersion}) %>% do.call(rbind,.)
-  res_permanova_1 <- lapply(1:length(res_sum),function(i){res_sum[[i]]$permanova}) %>% do.call(rbind,.)
+  all_comb_df <- expand.grid(TimePoint = c("All", "Week3", "Week6", "Week9-14", "Week18"),
+                             Sex = c("All", "M", "F"),
+                             stringsAsFactors = F)
+  comp_BirthMode <- combn(wmeta$BirthMode %>% unique() %>% as.character(),2)
+  comp_TimePoint <- combn(wmeta$TimePoint %>% unique() %>% as.character(),2)
   
-  ## BirthMode + sex by TimePoint
-  res_sum <- lapply(c(wmeta$TimePoint %>% unique()), function(tp){
-    wmeta_s <- wmeta %>% filter(TimePoint == tp)
-    wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
-    disper <- betadisper(wdist_s, wmeta_s$BirthMode)   
-    d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-      rownames_to_column(var = "Comp")
-    d1 <- d1 %>% mutate(Sex = "Both", TimePoint = tp, Variable = "BirthMode")
-    disper <- betadisper(wdist_s, wmeta_s$Sex)
-    d2 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-      rownames_to_column(var = "Comp")
-    d2 <- d2 %>% mutate(Sex = "Both", TimePoint = tp, Variable = "Sex")    
-    
-    comp <- combn(wwmeta$BirthMode %>% unique() %>% as.character(),2)
-    res <- lapply(1:ncol(comp), function(i){
-      wmeta_ss <- wmeta_s %>% filter(BirthMode %in% comp[,i])
-      wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
-      calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + Sex, data = wmeta_ss, by = "terms")) %>% 
-        as.data.frame() %>% mutate(Comp = str_c(comp[1,i], comp[2,i], sep = "-")) %>% 
-        filter(!is.na(F))
-    }) %>% do.call(rbind, .) %>% 
-      mutate(Sex = "Both", TimePoint = tp, fo = "~ BirthMode + Sex") 
-    res <- rbind(res,
-                 calcOmega2_dm(adonis2(wdist_s ~ BirthMode + Sex, data = wmeta_s, by = "terms")) %>% 
-                   as.data.frame() %>% mutate(Comp = "All") %>% filter(!is.na(F)) %>% 
-                   mutate(Sex = "Both", TimePoint = tp, fo = "~ BirthMode + Sex"))
-    list(dispersion = rbind(d1,d2), permanova = res)
-  })
-  res_dispersion_2 <- lapply(1:length(res_sum),function(i){res_sum[[i]]$dispersion}) %>% do.call(rbind,.)
-  res_permanova_2 <- lapply(1:length(res_sum),function(i){res_sum[[i]]$permanova}) %>% do.call(rbind,.)
+  res_dispersion <- list()
+  res_permanova <- list()
   
-  ## BirthMode + Sex + TimePoint
-  disper <- betadisper(wdist, wmeta$BirthMode)   
-  d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-    rownames_to_column(var = "Comp")
-  d1 <- d1 %>% mutate(Sex = "Both", TimePoint = "All", Variable = "BirthMode")
-  disper <- betadisper(wdist, wmeta$Sex)
-  d2 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-    rownames_to_column(var = "Comp")
-  d2 <- d2 %>% mutate(Sex = "Both", TimePoint = "All", Variable = "Sex")
-  disper <- betadisper(wdist, wmeta$TimePoint)
-  d3 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
-    rownames_to_column(var = "Comp")
-  d3 <- d3 %>% mutate(Sex = "Both", TimePoint = "All", Variable = "TimePoint")
-  res_dispersion_3 <- rbind(d1, d2, d3)
-  
-  comp <- combn(wwmeta$BirthMode %>% unique() %>% as.character(),2)
-  res <- lapply(1:ncol(comp), function(i){
-    wmeta_ss <- wmeta %>% filter(BirthMode %in% comp[,i])
-    wdist_ss <- dist_subset(wdist, wmeta_ss$SampleID)
-    calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + Sex + TimePoint, data = wmeta_ss, by = "terms")) %>% 
-      as.data.frame() %>% mutate(Comp = str_c(comp[1,i], comp[2,i], sep = "-")) %>% 
-      filter(!is.na(F))
-  }) %>% do.call(rbind, .) %>% 
-    mutate(Sex = "Both", TimePoint = "All", fo = "~ BirthMode + Sex + TimePoint") 
-  res_permanova_3 <- calcOmega2_dm(adonis2(wdist ~ BirthMode + Sex + TimePoint, data = wmeta, by = "terms")) %>% 
-    as.data.frame() %>% mutate(Comp = "All") %>% filter(!is.na(F)) %>% 
-    mutate(Sex = "Both", TimePoint = "All", fo = "~ BirthMode + Sex + TimePoint") %>% 
-    rbind(res,.)
-  
-  res <- rbind(res_permanova_1, res_permanova_2, res_permanova_3)
+  for(i in 1:nrow(all_comb_df)){
+    if(all_comb_df[i,"TimePoint"] ==  "All" & all_comb_df[i,"Sex"] ==  "All"){
+      # dispersion all variable
+      disper <- betadisper(wdist, wmeta$BirthMode)   
+      d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d1 <- d1 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "BirthMode")
+      disper <- betadisper(wdist, wmeta$Sex)
+      d2 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d2 <- d2 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "Sex")
+      disper <- betadisper(wdist, wmeta$TimePoint)
+      d3 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d3 <- d3 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "TimePoint")
+      res_dispersion <- list.append(res_dispersion, rbind(d1, d2, d3))
+      # permanova pairwise BirthMode
+      res1 <- lapply(1:ncol(comp_BirthMode), function(i){
+        wmeta_ss <- wmeta %>% filter(BirthMode %in% comp_BirthMode[,i])
+        wdist_ss <- dist_subset(wdist, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + Sex + TimePoint, data = wmeta_ss, by = "margin")) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_BirthMode[1,i], comp_BirthMode[2,i], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex + TimePoint") 
+      # permanova pairwise TimePoint
+      res2 <- lapply(1:ncol(comp_TimePoint), function(i){
+        wmeta_ss <- wmeta %>% filter(TimePoint %in% comp_TimePoint[,i])
+        wdist_ss <- dist_subset(wdist, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + Sex + TimePoint, data = wmeta_ss, by = "margin")) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_TimePoint[1,i], comp_TimePoint[2,i], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex + TimePoint") 
+      # permanova 
+      res3 <- calcOmega2_dm(adonis2(wdist ~ BirthMode + Sex + TimePoint, data = wmeta, by = "margin")) %>% 
+        as.data.frame() %>% mutate(Comp = "All") %>% 
+        filter(!is.na(F)) %>%  
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex + TimePoint")
+      res_permanova <- list.append(res_permanova, rbind(res1, res2, res3))
+    }else if(all_comb_df[i,"TimePoint"] !=  "All" & all_comb_df[i,"Sex"] ==  "All"){
+      wmeta_s <- wmeta %>% filter(TimePoint == all_comb_df[i,"TimePoint"])
+      wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
+      # dispersion BirthMode, Sex
+      disper <- betadisper(wdist_s, wmeta_s$BirthMode)   
+      d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d1 <- d1 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "BirthMode")
+      disper <- betadisper(wdist, wmeta$Sex)
+      d2 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d2 <- d2 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "Sex")
+      res_dispersion <- list.append(res_dispersion, rbind(d1, d2))
+      # permanova pairwise BirthMode
+      res1 <- lapply(1:ncol(comp_BirthMode), function(i){
+        wmeta_ss <- wmeta_s %>% filter(BirthMode %in% comp_BirthMode[,i])
+        wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + Sex, data = wmeta_ss, by = "margin")) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_BirthMode[1,i], comp_BirthMode[2,i], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex") 
+      # permanova 
+      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode + Sex + TimePoint, data = wmeta_s, by = "margin")) %>% 
+        as.data.frame() %>% mutate(Comp = "All") %>% 
+        filter(!is.na(F)) %>%  
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex") 
+      res_permanova <- list.append(res_permanova, rbind(res1, res3))     
+    }else if(all_comb_df[i,"TimePoint"] ==  "All" & all_comb_df[i,"Sex"] !=  "All"){
+      wmeta_s <- wmeta %>% filter(Sex == all_comb_df[i,"Sex"])
+      wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
+      # dispersion BirthMode, Sex
+      disper <- betadisper(wdist_s, wmeta_s$BirthMode)   
+      d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d1 <- d1 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "BirthMode")
+      disper <- betadisper(wdist_s, wmeta_s$TimePoint)
+      d3 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d3 <- d3 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "TimePoint")
+      res_dispersion <- list.append(res_dispersion, rbind(d1, d3))
+      # permanova pairwise BirthMode
+      res1 <- lapply(1:ncol(comp_BirthMode), function(i){
+        wmeta_ss <- wmeta_s %>% filter(BirthMode %in% comp_BirthMode[,i])
+        wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + TimePoint, data = wmeta_ss, by = "margin")) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_BirthMode[1,i], comp_BirthMode[2,i], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex = all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + TimePoint") 
+      # permanova pairwise TimePoint      
+      res2 <- lapply(1:ncol(comp_TimePoint), function(i){
+        wmeta_ss <- wmeta_s %>% filter(TimePoint %in% comp_TimePoint[,i])
+        wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode +TimePoint, data = wmeta_ss, by = "margin")) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_TimePoint[1,i], comp_TimePoint[2,i], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + TimePoint") 
+      # permanova 
+      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode + TimePoint, data = wmeta_s, by = "margin")) %>% 
+        as.data.frame() %>% mutate(Comp = "All") %>% 
+        filter(!is.na(F)) %>%  
+        mutate(Sex = all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + TimePoint") 
+      res_permanova <- list.append(res_permanova, rbind(res1, res2, res3))    
+    }else if(all_comb_df[i,"TimePoint"] !=  "All" & all_comb_df[i,"Sex"] !=  "All"){
+      wmeta_s <- wmeta %>% filter(Sex == all_comb_df[i,"Sex"], TimePoint == all_comb_df[i,"TimePoint"])
+      wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
+      # dispersion BirthMode, Sex
+      disper <- betadisper(wdist_s, wmeta_s$BirthMode)   
+      d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d1 <- d1 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "BirthMode")
+      res_dispersion <- list.append(res_dispersion, d1)
+      # permanova pairwise BirthMode
+      res1 <- lapply(1:ncol(comp_BirthMode), function(j){
+        wmeta_ss <- wmeta_s %>% filter(BirthMode %in% comp_BirthMode[,j])
+        wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode, data = wmeta_ss, by = "margin")) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_BirthMode[1,j], comp_BirthMode[2,j], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex = all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode")
+      # permanova 
+      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode, data = wmeta_s, by = "margin")) %>% 
+        as.data.frame() %>% mutate(Comp = "All") %>% 
+        filter(!is.na(F)) %>%  
+        mutate(Sex = all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode") 
+      res_permanova <- list.append(res_permanova, rbind(res1, res3))    
+    }  
+  }
+  res <- res_permanova %>% do.call(rbind, .) 
   res$padj <- p.adjust(res$`Pr(>F)`, method = "fdr")
   write.csv(res,
             file = paste0(temp_out, "beta/adonis_all_",dd, "_table.csv"),
             quote = F, row.names = F)
-  write.csv(rbind(res_dispersion_1, res_dispersion_2, res_dispersion_3),
+  write.csv(res_dispersion %>% do.call(rbind, .),
             file = paste0(temp_out, "beta/dispersion_all_",dd, "_table.csv"),
             quote = F, row.names = F)
+  
 }
+```
+
+# effect of birthmode, by sex and TimePoint adjusted by FamilyID 
+```{r}
+for(dd in c("uu","wu","bray","jaccard")){
+  wdist <- get(paste0("DM_",dd))
+  wmeta <- meta_all %>% filter(SampleID %in% labels(wdist)) %>% 
+    filter(Generation == "F1")
+  wdist <- dist_subset(wdist, wmeta$SampleID)
+  
+  all_comb_df <- expand.grid(TimePoint = c("All", "Week3", "Week6", "Week9-14", "Week18"),
+                             Sex = c("All", "M", "F"),
+                             stringsAsFactors = F)
+  comp_BirthMode <- combn(wmeta$BirthMode %>% unique() %>% as.character(),2)
+  comp_TimePoint <- combn(wmeta$TimePoint %>% unique() %>% as.character(),2)
+  
+  res_dispersion <- list()
+  res_permanova <- list()
+  
+  for(i in 1:nrow(all_comb_df)){
+    if(all_comb_df[i,"TimePoint"] ==  "All" & all_comb_df[i,"Sex"] ==  "All"){
+      # dispersion all variable
+      disper <- betadisper(wdist, wmeta$BirthMode)   
+      d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d1 <- d1 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "BirthMode")
+      disper <- betadisper(wdist, wmeta$Sex)
+      d2 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d2 <- d2 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "Sex")
+      disper <- betadisper(wdist, wmeta$TimePoint)
+      d3 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d3 <- d3 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "TimePoint")
+      res_dispersion <- list.append(res_dispersion, rbind(d1, d2, d3))
+      # permanova pairwise BirthMode
+      res1 <- lapply(1:ncol(comp_BirthMode), function(j){
+        wmeta_ss <- wmeta %>% filter(BirthMode %in% comp_BirthMode[,j])
+        wdist_ss <- dist_subset(wdist, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + Sex + TimePoint, data = wmeta_ss, by = "margin", strata = wmeta_ss$FamilyID)) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_BirthMode[1,j], comp_BirthMode[2,j], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex + TimePoint|FamilyID") 
+      # permanova pairwise TimePoint
+      res2 <- lapply(1:ncol(comp_TimePoint), function(j){
+        wmeta_ss <- wmeta %>% filter(TimePoint %in% comp_TimePoint[,j])
+        wdist_ss <- dist_subset(wdist, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + Sex + TimePoint, data = wmeta_ss, by = "margin", strata = wmeta_ss$FamilyID)) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_TimePoint[1,j], comp_TimePoint[2,j], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex + TimePoint|FamilyID") 
+      # permanova
+      res3 <- calcOmega2_dm(adonis2(wdist ~ BirthMode + Sex + TimePoint, data = wmeta, by = "margin", strata = wmeta$FamilyID)) %>% 
+        as.data.frame() %>% mutate(Comp = "All") %>% 
+        filter(!is.na(F)) %>%  
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex + TimePoint|FamilyID")
+      res_permanova <- list.append(res_permanova, rbind(res1, res2, res3))
+    }else if(all_comb_df[i,"TimePoint"] !=  "All" & all_comb_df[i,"Sex"] ==  "All"){
+      wmeta_s <- wmeta %>% filter(TimePoint == all_comb_df[i,"TimePoint"])
+      wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
+      # dispersion BirthMode, Sex
+      disper <- betadisper(wdist_s, wmeta_s$BirthMode)   
+      d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d1 <- d1 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "BirthMode")
+      disper <- betadisper(wdist, wmeta$Sex)
+      d2 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d2 <- d2 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "Sex")
+      res_dispersion <- list.append(res_dispersion, rbind(d1, d2))
+      # permanova pairwise BirthMode
+      res1 <- lapply(1:ncol(comp_BirthMode), function(j){
+        wmeta_ss <- wmeta_s %>% filter(BirthMode %in% comp_BirthMode[,j])
+        wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + Sex, data = wmeta_ss, by = "margin",strata = wmeta_ss$FamilyID)) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_BirthMode[1,j], comp_BirthMode[2,j], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex|FamilyID") 
+      # permanova 
+      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode + Sex + TimePoint, data = wmeta_s, by = "margin", strata = wmeta_s$FamilyID)) %>% 
+        as.data.frame() %>% mutate(Comp = "All") %>% 
+        filter(!is.na(F)) %>%  
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + Sex|FamilyID") 
+      res_permanova <- list.append(res_permanova, rbind(res1, res3))     
+    }else if(all_comb_df[i,"TimePoint"] ==  "All" & all_comb_df[i,"Sex"] !=  "All"){
+      wmeta_s <- wmeta %>% filter(Sex == all_comb_df[i,"Sex"])
+      wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
+      # dispersion BirthMode, Sex
+      disper <- betadisper(wdist_s, wmeta_s$BirthMode)   
+      d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d1 <- d1 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "BirthMode")
+      disper <- betadisper(wdist_s, wmeta_s$TimePoint)
+      d3 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d3 <- d3 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "TimePoint")
+      res_dispersion <- list.append(res_dispersion, rbind(d1, d3))
+      # permanova pairwise BirthMode
+      res1 <- lapply(1:ncol(comp_BirthMode), function(j){
+        wmeta_ss <- wmeta_s %>% filter(BirthMode %in% comp_BirthMode[,j])
+        wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode + TimePoint, data = wmeta_ss, by = "margin", strata = wmeta_ss$FamilyID)) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_BirthMode[1,j], comp_BirthMode[2,j], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex = all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + TimePoint|FamilyID") 
+      # permanova pairwise TimePoint      
+      res2 <- lapply(1:ncol(comp_TimePoint), function(j){
+        wmeta_ss <- wmeta_s %>% filter(TimePoint %in% comp_TimePoint[,j])
+        wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode +TimePoint, data = wmeta_ss, by = "margin", strata = wmeta_ss$FamilyID)) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_TimePoint[1,j], comp_TimePoint[2,j], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + TimePoint|FamilyID") 
+      # permanova 
+      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode + TimePoint, data = wmeta_s, by = "margin",strata = wmeta_s$FamilyID)) %>% 
+        as.data.frame() %>% mutate(Comp = "All") %>% 
+        filter(!is.na(F)) %>%  
+        mutate(Sex = all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode + TimePoint") 
+      res_permanova <- list.append(res_permanova, rbind(res1, res2, res3))    
+    }else if(all_comb_df[i,"TimePoint"] !=  "All" & all_comb_df[i,"Sex"] !=  "All"){
+      wmeta_s <- wmeta %>% filter(Sex == all_comb_df[i,"Sex"], TimePoint == all_comb_df[i,"TimePoint"])
+      wdist_s <- dist_subset(wdist, wmeta_s$SampleID)
+      # dispersion BirthMode, Sex
+      disper <- betadisper(wdist_s, wmeta_s$BirthMode)   
+      d1 <- (TukeyHSD(disper, which = "group"))$group %>% as.data.frame() %>% 
+        rownames_to_column(var = "Comp")
+      d1 <- d1 %>% mutate(Sex =  all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], Variable = "BirthMode")
+      res_dispersion <- list.append(res_dispersion, d1)
+      # permanova pairwise BirthMode
+      res1 <- lapply(1:ncol(comp_BirthMode), function(i){
+        wmeta_ss <- wmeta_s %>% filter(BirthMode %in% comp_BirthMode[,i])
+        wdist_ss <- dist_subset(wdist_s, wmeta_ss$SampleID)
+        perms <- with(wmeta_ss, how(blocks = FamilyID, complete = FALSE, observed = TRUE))
+        calcOmega2_dm(adonis2(wdist_ss ~ BirthMode, data = wmeta_ss, by = "margin", permutations = perms)) %>% 
+          as.data.frame() %>% mutate(Comp = str_c(comp_BirthMode[1,i], comp_BirthMode[2,i], sep = "-")) %>% 
+          filter(!is.na(F))
+      }) %>% do.call(rbind, .) %>% 
+        mutate(Sex = all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode|FamilyID")
+      # permanova 
+      perms <- with(wmeta_s, how(blocks = FamilyID, complete = FALSE, observed = TRUE))
+      res3 <- calcOmega2_dm(adonis2(wdist_s ~ BirthMode, data = wmeta_s, by = "margin", permutations = perms)) %>% 
+        as.data.frame() %>% mutate(Comp = "All") %>% 
+        filter(!is.na(F)) %>%  
+        mutate(Sex = all_comb_df[i,"Sex"], TimePoint = all_comb_df[i,"TimePoint"], fo = "~ BirthMode|FamilyID") 
+      res_permanova <- list.append(res_permanova, rbind(res1, res3))    
+    }  
+  }
+  res <- res_permanova %>% do.call(rbind, .) 
+  res$padj <- p.adjust(res$`Pr(>F)`, method = "fdr")
+  write.csv(res,
+            file = paste0(temp_out, "beta/adonis_all_",dd, "_adj_FamilyID_table.csv"),
+            quote = F, row.names = F)
+  write.csv(res_dispersion %>% do.call(rbind, .),
+            file = paste0(temp_out, "beta/dispersion_all_",dd, "_adj_FamilyID_table.csv"),
+            quote = F, row.names = F)
+}
+
+
+ 
 ```
 
 ## plot pups PCoA use vegan mds, nmds
